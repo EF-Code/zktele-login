@@ -148,3 +148,63 @@ dl {
 pre {
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 }
+
+pre {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0.5rem 0.6rem;
+  font-size: 0.75rem;
+  max-width: 100%;
+  overflow: auto;
+  text-align: left;
+}
+
+.dim {
+  color: var(--dim);
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+}
+
+th,
+td {
+  text-align: left;
+  padding: 0.45rem 0.5rem;
+  border-bottom: 1px solid var(--border);
+  vertical-align: top;
+}
+
+th {
+  color: var(--dim);
+  font-weight: 600;
+}
+
+td.ok {
+  color: var(--ok);
+}
+
+td.err {
+  color: var(--err);
+}
+
+ul {
+  padding-left: 1.2rem;
+  color: var(--text);
+}
+
+li {
+  margin-bottom: 0.5rem;
+}
+
+code {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 0 0.3rem;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.85em;
+}
