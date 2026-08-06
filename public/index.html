@@ -36,6 +36,13 @@
     </section>
 
     <section class="card">
+      <h2>Allowlist membership</h2>
+      <p class="hint">Prove you're on a private list — without revealing who you are. The app only commits to a <em>root</em> hash; your <code>userId</code> stays hidden even inside the revealed leaf (<code>leaf = Poseidon(userId, 1)</code>).</p>
+      <div id="membership-actions" class="identities"></div>
+      <div id="membership-result" class="status hidden"></div>
+    </section>
+
+    <section class="card">
       <h2>Session log</h2>
       <table id="log">
         <thead>
