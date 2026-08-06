@@ -4,6 +4,7 @@ import * as path from 'path';
 import * as crypto from 'crypto';
 import { fileURLToPath } from 'url';
 import { ZkTeleAuthGateway } from 'zk-tele-auth/dist/gateway/server.js';
+import { ZkAuthProofVerifier } from 'zk-tele-auth/dist/sdk/index.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PUBLIC_DIR = path.join(__dirname, 'public');
@@ -102,6 +103,11 @@ const server = http.createServer(async (req, res) => {
         if (typeof body.initData !== 'string') throw new Error('initData required');
         const result = await gateway.handleAuthenticate(body.initData);
         send(res, 200, result);
+        return;
+      }
+      case '/api/verify': {
+        const verification = await ZkAuthProofVerifier.verifyProof(body.proofPayload, APP_DOMAIN);
+        send(res, 200, verification);
         return;
       }
       default:
