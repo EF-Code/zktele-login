@@ -15,6 +15,8 @@ const PORT = Number(process.env.PORT || 3000);
 
 const gateway = new ZkTeleAuthGateway(BOT_TOKEN, APP_DOMAIN);
 
+const claims = new Map();
+
 /**
  * Replicates Telegram's MiniApp initData signing (WebAppData HMAC scheme) so
  * the flow can be exercised locally. In production Telegram signs initData —
@@ -108,6 +110,30 @@ const server = http.createServer(async (req, res) => {
       case '/api/verify': {
         const verification = await ZkAuthProofVerifier.verifyProof(body.proofPayload, APP_DOMAIN);
         send(res, 200, verification);
+        return;
+      }
+      case '/api/claim': {
+        const verification = await ZkAuthProofVerifier.verifyProof(body.proofPayload, APP_DOMAIN);
+        if (!verification.isValid) {
+          send(res, 400, { claimed: false, error: verification.error || 'proof invalid' });
+          return;
+        }
+        const nullifier = verification.nullifierHash;
+        if (claims.has(nullifier)) {
+          send(res, 409, {
+            claimed: false,
+            nullifierHash: nullifier,
+            claims: claims.size,
+            error: 'nullifier already claimed — replay rejected',
+          });
+          return;
+        }
+        claims.set(nullifier, Date.now());
+        send(res, 200, { claimed: true, nullifierHash: nullifier, claims: claims.size });
+        return;
+      }
+      case '/api/claims': {
+        send(res, 200, { claims: claims.size });
         return;
       }
       default:
