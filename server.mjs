@@ -3,12 +3,16 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as crypto from 'crypto';
 import { fileURLToPath } from 'url';
+import { ZkTeleAuthGateway } from 'zk-tele-auth/dist/gateway/server.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PUBLIC_DIR = path.join(__dirname, 'public');
 
 const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || '123456:DEV-TOKEN-DO-NOT-USE-IN-PRODUCTION';
+const APP_DOMAIN = process.env.APP_DOMAIN || 'zktele-login.demo';
 const PORT = Number(process.env.PORT || 3000);
+
+const gateway = new ZkTeleAuthGateway(BOT_TOKEN, APP_DOMAIN);
 
 /**
  * Replicates Telegram's MiniApp initData signing (WebAppData HMAC scheme) so
@@ -75,24 +79,34 @@ const server = http.createServer(async (req, res) => {
 
   try {
     const body = await readBody(req);
-    if (url !== '/api/init') {
-      send(res, 404, { error: 'not found' });
-      return;
+    switch (url) {
+      case '/api/init': {
+        // DEV ONLY: sign an initData as Telegram would, for the given user.
+        const userId = Number(body.userId) || 0;
+        if (!userId) throw new Error('userId required');
+        const user = JSON.stringify({
+          id: userId,
+          first_name: 'User',
+          is_premium: Boolean(body.isPremium),
+        });
+        const params = {
+          auth_date: Math.floor(Date.now() / 1000).toString(),
+          query_id: crypto.randomBytes(8).toString('hex'),
+          user,
+        };
+        const initData = new URLSearchParams(signInitData(params)).toString();
+        send(res, 200, { initData });
+        return;
+      }
+      case '/api/authenticate': {
+        if (typeof body.initData !== 'string') throw new Error('initData required');
+        const result = await gateway.handleAuthenticate(body.initData);
+        send(res, 200, result);
+        return;
+      }
+      default:
+        send(res, 404, { error: 'not found' });
     }
-    const userId = Number(body.userId) || 0;
-    if (!userId) throw new Error('userId required');
-    const user = JSON.stringify({
-      id: userId,
-      first_name: 'User',
-      is_premium: Boolean(body.isPremium),
-    });
-    const params = {
-      auth_date: Math.floor(Date.now() / 1000).toString(),
-      query_id: crypto.randomBytes(8).toString('hex'),
-      user,
-    };
-    const initData = new URLSearchParams(signInitData(params)).toString();
-    send(res, 200, { initData });
   } catch (err) {
     send(res, 400, { error: err instanceof Error ? err.message : String(err) });
   }
@@ -101,5 +115,6 @@ const server = http.createServer(async (req, res) => {
 server.listen(PORT, () => {
   const isDevToken = BOT_TOKEN === '123456:DEV-TOKEN-DO-NOT-USE-IN-PRODUCTION';
   console.log(`zktele-login demo listening on http://localhost:${PORT}`);
+  console.log(`  appDomain:      ${APP_DOMAIN}`);
   console.log(`  bot token:      ${isDevToken ? 'DEV placeholder (initData is simulated)' : 'provided via env'}`);
 });
