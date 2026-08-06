@@ -41,7 +41,14 @@ Options:
 - **Freshness & tamper-resistance** — proofs carry a timestamp and are
   pairing-checked; the "replay" button shows a tampered proof being rejected.
 - **Domain binding** — the app domain is hashed into the circuit, so a proof
-  minted for this demo can't be replayed on another app.
+  minted for this demo can't be replayed on another app (try the cross-domain
+  button).
+- **Session claims** — a nullifier registry lets the app hand out "one thing
+  per account": a claim succeeds once, and replaying the same proof is
+  rejected.
+- **Allowlist membership** — prove you're on a private list without revealing
+  who you are. The app commits to a Merkle `root` only; `leaf = Poseidon(userId,
+  1)` hides the account even from the leaf, and outsiders get `isMember=0`.
 
 ## API
 
@@ -49,7 +56,13 @@ Options:
 |---|---|---|
 | `POST /api/init` | `{ userId, isPremium }` | `{ initData }` signed like Telegram would |
 | `POST /api/authenticate` | `{ initData }` | `{ nullifierHash, proofPayload }` |
-| `POST /api/verify` | `{ proofPayload }` | `{ isValid, nullifierHash, error? }` |
+| `POST /api/verify` | `{ proofPayload, appDomain? }` | `{ isValid, nullifierHash, error? }` |
+| `POST /api/claim` | `{ proofPayload }` | `{ claimed, claims }` — 409 on replay |
+| `GET /api/claims` | — | `{ claims }` |
+| `GET /api/config` | — | `{ appDomain }` |
+| `GET /api/membership` | — | `{ root, memberCount, members }` |
+| `POST /api/membership/prove` | `{ memberId }` | `{ proofPayload, leaf, isMember }` |
+| `POST /api/membership/verify` | `{ proofPayload }` | `{ isValid, isMember, leaf, root, error? }` |
 
 ## Security notes
 
