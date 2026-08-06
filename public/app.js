@@ -95,6 +95,7 @@ async function login(identity) {
     addLogRow(identity, nullifier, true);
     $('#replay').disabled = false;
     $('#claim').disabled = false;
+    $('#cross-domain').disabled = false;
     $('#claim-result').classList.add('hidden');
   } catch (err) {
     setStatus('error', err.message || String(err));
@@ -163,8 +164,28 @@ $('#reclaim').addEventListener('click', async () => {
   }
 });
 
-$('#replay').addEventListener('click', async () => {
+$('#cross-domain').addEventListener('click', async () => {
   if (!state.lastProofPayload) return;
+  setStatus('working', 'Verifying this proof against another app domain…');
+  try {
+    const verification = await post('/api/verify', {
+      proofPayload: state.lastProofPayload,
+      appDomain: 'evil.example',
+    });
+    setStatus(
+      verification.isValid ? 'error' : 'ok',
+      verification.isValid
+        ? 'Proof accepted for another domain?! This should never happen.'
+        : `Cross-domain proof rejected: ${verification.error}`
+    );
+    addLogRow({ label: `Cross-domain (${APP_DOMAIN} → evil.example)` }, null, false, verification.error || 'rejected');
+  } catch (err) {
+    setStatus('ok', `Cross-domain proof rejected: ${err.message}`);
+    addLogRow({ label: `Cross-domain (${APP_DOMAIN} → evil.example)` }, null, false, err.message);
+  }
+});
+
+$('#replay').addEventListener('click', async () => {  if (!state.lastProofPayload) return;
   setStatus('working', 'Replaying a previously issued proof…');
   try {
     const tampered = structuredClone(state.lastProofPayload);
