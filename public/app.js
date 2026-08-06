@@ -94,6 +94,8 @@ async function login(identity) {
 
     addLogRow(identity, nullifier, true);
     $('#replay').disabled = false;
+    $('#claim').disabled = false;
+    $('#claim-result').classList.add('hidden');
   } catch (err) {
     setStatus('error', err.message || String(err));
     addLogRow(identity, null, false, err.message);
@@ -125,6 +127,41 @@ function setStatus(kind, text) {
   $('#status').className = `status ${kind}`;
   $('#status').textContent = text;
 }
+
+async function claimOnce() {
+  if (!state.lastProofPayload) return;
+  const out = $('#claim-result');
+  out.classList.remove('hidden');
+  out.className = 'status working';
+  out.textContent = 'Claiming this nullifier…';
+  try {
+    const res = await post('/api/claim', { proofPayload: state.lastProofPayload });
+    out.className = 'status ok';
+    out.textContent = `Claimed! This nullifier is now spoken for (${res.claims} total claims).`;
+    $('#reclaim').disabled = false;
+  } catch (err) {
+    out.className = 'status error';
+    out.textContent = `Claim rejected: ${err.message}`;
+  }
+}
+
+$('#claim').addEventListener('click', claimOnce);
+
+$('#reclaim').addEventListener('click', async () => {
+  if (!state.lastProofPayload) return;
+  const out = $('#claim-result');
+  out.classList.remove('hidden');
+  out.className = 'status working';
+  out.textContent = 'Re-submitting the same proof…';
+  try {
+    const res = await post('/api/claim', { proofPayload: state.lastProofPayload });
+    out.className = 'status error';
+    out.textContent = `Unexpected: claim succeeded again (${res.claims})! This should never happen.`;
+  } catch (err) {
+    out.className = 'status ok';
+    out.textContent = `Replay rejected: ${err.message}`;
+  }
+});
 
 $('#replay').addEventListener('click', async () => {
   if (!state.lastProofPayload) return;
