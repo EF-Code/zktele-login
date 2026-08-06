@@ -185,7 +185,8 @@ $('#cross-domain').addEventListener('click', async () => {
   }
 });
 
-$('#replay').addEventListener('click', async () => {  if (!state.lastProofPayload) return;
+$('#replay').addEventListener('click', async () => {
+  if (!state.lastProofPayload) return;
   setStatus('working', 'Replaying a previously issued proof…');
   try {
     const tampered = structuredClone(state.lastProofPayload);
@@ -204,4 +205,49 @@ $('#replay').addEventListener('click', async () => {  if (!state.lastProofPayloa
   }
 });
 
+async function loadAllowlist() {
+  const info = await post('/api/membership', {});
+  const container = $('#membership-actions');
+  container.innerHTML = '';
+  for (const memberId of info.members) {
+    const btn = document.createElement('button');
+    btn.className = 'identity';
+    btn.textContent = `Prove I'm on the list (member #${memberId})`;
+    btn.addEventListener('click', () => membershipProve(memberId));
+    container.appendChild(btn);
+  }
+  const outsider = document.createElement('button');
+  outsider.className = 'identity';
+  outsider.textContent = `Prove I'm on the list (outsider #99999)`;
+  outsider.addEventListener('click', () => membershipProve(99999));
+  container.appendChild(outsider);
+  return info;
+}
+
+async function membershipProve(memberId) {
+  const out = $('#membership-result');
+  out.classList.remove('hidden');
+  out.className = 'status working';
+  out.textContent = 'Generating membership proof…';
+
+  try {
+    const prove = await post('/api/membership/prove', { memberId });
+    const verification = await post('/api/membership/verify', {
+      proofPayload: prove.proofPayload,
+    });
+
+    out.className = verification.isValid ? 'status ok' : 'status error';
+    out.innerHTML = verification.isValid
+      ? `<strong>On the allowlist.</strong> The app accepts this proof but only ever sees:<br>
+         <span class="mono dim">leaf = ${shortHash(verification.leaf)}</span> ·
+         <span class="mono dim">root = ${shortHash(verification.root)}</span><br>
+         Your <code>userId</code> and sibling path stay private.`
+      : `Not on the allowlist: ${verification.error}`;
+  } catch (err) {
+    out.className = 'status error';
+    out.textContent = `Membership check failed: ${err.message}`;
+  }
+}
+
 renderIdentities();
+loadAllowlist();
