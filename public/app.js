@@ -91,8 +91,12 @@ async function login(identity) {
       <div class="row"><dt>Server received</dt><dd><pre class="mono dim">${JSON.stringify({ ...auth, proofPayload: '…' }, null, 2)}</pre></dd></div>
       <div class="row"><dt>Proof public signals</dt><dd><pre class="mono dim">${JSON.stringify(auth.proofPayload.publicSignals, null, 2)}</pre></dd></div>
     `;
+
+    addLogRow(identity, nullifier, true);
+    $('#replay').disabled = false;
   } catch (err) {
     setStatus('error', err.message || String(err));
+    addLogRow(identity, null, false, err.message);
   }
 }
 
@@ -105,9 +109,41 @@ function proofSize(proof) {
   }
 }
 
+function addLogRow(identity, nullifier, ok, error = '') {
+  const tbody = $('#log tbody');
+  const tr = document.createElement('tr');
+  tr.innerHTML = `
+    <td>#${state.attempts}</td>
+    <td>${identity.label}</td>
+    <td class="mono">${nullifier ? shortHash(nullifier) : '—'}</td>
+    <td class="${ok ? 'ok' : 'err'}">${ok ? 'VALID' : error || 'INVALID'}</td>
+  `;
+  tbody.prepend(tr);
+}
+
 function setStatus(kind, text) {
   $('#status').className = `status ${kind}`;
   $('#status').textContent = text;
 }
+
+$('#replay').addEventListener('click', async () => {
+  if (!state.lastProofPayload) return;
+  setStatus('working', 'Replaying a previously issued proof…');
+  try {
+    const tampered = structuredClone(state.lastProofPayload);
+    tampered.proof.pi_a[0] = '0xdeadbeef';
+    const verification = await post('/api/verify', { proofPayload: tampered });
+    setStatus(
+      verification.isValid ? 'error' : 'ok',
+      verification.isValid
+        ? 'Tampered proof VERIFIED?! This should never happen.'
+        : `Tampered proof rejected: ${verification.error}`
+    );
+    addLogRow({ label: 'Replay (tampered)' }, null, false, verification.error || 'rejected');
+  } catch (err) {
+    setStatus('ok', `Replay rejected: ${err.message}`);
+    addLogRow({ label: 'Replay (tampered)' }, null, false, err.message);
+  }
+});
 
 renderIdentities();
