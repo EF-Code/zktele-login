@@ -82,6 +82,15 @@ const server = http.createServer(async (req, res) => {
       send(res, 200, { appDomain: APP_DOMAIN, botTokenIsDev: BOT_TOKEN === '123456:DEV-TOKEN-DO-NOT-USE-IN-PRODUCTION' });
       return;
     }
+    if (url === '/api/membership') {
+      send(res, 200, {
+        root: ALLOWLIST_ROOT,
+        depth: 12,
+        memberCount: MEMBER_COUNT,
+        members: MEMBER_IDS,
+      });
+      return;
+    }
     serveStatic(res, url);
     return;
   }
