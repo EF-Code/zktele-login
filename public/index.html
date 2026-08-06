@@ -17,6 +17,7 @@
       <h2>Who are you logging in as?</h2>
       <p class="hint">Each button simulates Telegram opening your MiniApp for that identity. The <em>gateway</em> validates the signed initData, then emits a zero-knowledge proof. Your <code>userId</code> never leaves the gateway.</p>
       <div id="identities" class="identities"></div>
+      <button id="replay" class="ghost" disabled>Replay last login (tampered proof)</button>
     </section>
 
     <section id="result" class="card hidden">
@@ -33,6 +34,17 @@
         </thead>
         <tbody></tbody>
       </table>
+    </section>
+
+    <section class="card">
+      <h2>Why this is anonymous &amp; Sybil-resistant</h2>
+      <ul>
+        <li><strong>Anonymity</strong> — the only value a dApp ever learns is a <code>nullifier</code>. The server response above contains no <code>userId</code>, name, or photo — they never leave the gateway.</li>
+        <li><strong>Unlinkability</strong> — every login mints a <em>fresh</em> nullifier (a random salt is mixed in), so not even a server holding your full history can tell two logins belong to the same person.</li>
+        <li><strong>Sybil-resistance</strong> — a proof can only be minted for a real, bot-signed Telegram session (the HMAC check happens inside the gateway), so identities can't be forged for free.</li>
+        <li><strong>Freshness</strong> — the proof carries a timestamp; replayed, stale, or tampered proofs are rejected (try the replay button).</li>
+        <li><strong>Domain binding</strong> — the app domain is hashed into the circuit, so a proof minted for this demo can't be replayed on another app.</li>
+      </ul>
     </section>
   </main>
   <script src="/app.js"></script>
