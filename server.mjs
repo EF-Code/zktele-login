@@ -71,6 +71,10 @@ const server = http.createServer(async (req, res) => {
   const url = (req.url || '').split('?')[0];
 
   if (req.method === 'GET') {
+    if (url === '/api/config') {
+      send(res, 200, { appDomain: APP_DOMAIN, botTokenIsDev: BOT_TOKEN === '123456:DEV-TOKEN-DO-NOT-USE-IN-PRODUCTION' });
+      return;
+    }
     serveStatic(res, url);
     return;
   }
@@ -108,7 +112,8 @@ const server = http.createServer(async (req, res) => {
         return;
       }
       case '/api/verify': {
-        const verification = await ZkAuthProofVerifier.verifyProof(body.proofPayload, APP_DOMAIN);
+        const appDomain = typeof body.appDomain === 'string' ? body.appDomain : APP_DOMAIN;
+        const verification = await ZkAuthProofVerifier.verifyProof(body.proofPayload, appDomain);
         send(res, 200, verification);
         return;
       }
