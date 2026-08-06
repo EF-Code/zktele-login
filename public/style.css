@@ -95,3 +95,56 @@ button.ghost:disabled {
 .hidden {
   display: none;
 }
+
+.status {
+  border-radius: 8px;
+  padding: 0.75rem 1rem;
+  font-weight: 600;
+}
+
+.status.ok {
+  background: rgba(49, 196, 141, 0.12);
+  color: var(--ok);
+}
+
+.status.error {
+  background: rgba(240, 82, 82, 0.12);
+  color: var(--err);
+}
+
+.status.working {
+  background: rgba(42, 163, 239, 0.12);
+  color: var(--accent);
+}
+
+dl {
+  margin: 1rem 0 0;
+}
+
+.row {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.4rem 0;
+  border-bottom: 1px dashed var(--border);
+}
+
+.row:last-child {
+  border-bottom: none;
+}
+
+.row dt {
+  color: var(--dim);
+  flex-shrink: 0;
+}
+
+.row dd {
+  margin: 0;
+  text-align: right;
+  word-break: break-word;
+}
+
+.mono,
+pre {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
