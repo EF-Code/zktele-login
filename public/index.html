@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>zktele-login — anonymous Telegram login</title>
+  <link rel="stylesheet" href="/style.css" />
+</head>
+<body>
+  <main>
+    <header>
+      <h1>zktele-login</h1>
+      <p class="tagline">Log in with Telegram — <strong>nobody sees your ID</strong>.</p>
+    </header>
+
+    <section class="card">
+      <h2>Who are you logging in as?</h2>
+      <p class="hint">Each button simulates Telegram opening your MiniApp for that identity. The <em>gateway</em> validates the signed initData, then emits a zero-knowledge proof. Your <code>userId</code> never leaves the gateway.</p>
+      <div id="identities" class="identities"></div>
+    </section>
+
+    <section id="result" class="card hidden">
+      <h2>Login result</h2>
+      <div id="status" class="status"></div>
+      <dl id="detail"></dl>
+    </section>
+  </main>
+  <script src="/app.js"></script>
+</body>
+</html>
