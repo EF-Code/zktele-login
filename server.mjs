@@ -5,6 +5,13 @@ import * as crypto from 'crypto';
 import { fileURLToPath } from 'url';
 import { ZkTeleAuthGateway } from 'zk-tele-auth/dist/gateway/server.js';
 import { ZkAuthProofVerifier } from 'zk-tele-auth/dist/sdk/index.js';
+import {
+  ROOT as ALLOWLIST_ROOT,
+  MEMBER_COUNT,
+  MEMBER_IDS,
+  generateMembershipProof,
+  verifyMembershipProof,
+} from './lib/membership.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PUBLIC_DIR = path.join(__dirname, 'public');
@@ -139,6 +146,27 @@ const server = http.createServer(async (req, res) => {
       }
       case '/api/claims': {
         send(res, 200, { claims: claims.size });
+        return;
+      }
+      case '/api/membership': {
+        send(res, 200, {
+          root: ALLOWLIST_ROOT,
+          depth: 12,
+          memberCount: MEMBER_COUNT,
+          members: MEMBER_IDS,
+        });
+        return;
+      }
+      case '/api/membership/prove': {
+        const memberId = Number(body.memberId);
+        if (!memberId) throw new Error('memberId required');
+        const result = await generateMembershipProof(memberId);
+        send(res, 200, result);
+        return;
+      }
+      case '/api/membership/verify': {
+        const verification = await verifyMembershipProof(body.proofPayload);
+        send(res, 200, verification);
         return;
       }
       default:
