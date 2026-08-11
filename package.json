@@ -5,16 +5,26 @@
   "type": "module",
   "main": "server.mjs",
   "scripts": {
-    "start": "node server.mjs",
-    "dev": "node server.mjs"
+    "start": "NODE_ENV=production node server.mjs",
+    "dev": "NODE_ENV=development ALLOW_DEV_INIT=true node server.mjs",
+    "test": "NODE_ENV=test node --test --test-concurrency=1",
+    "test:postgres": "NODE_ENV=test node --test --test-concurrency=1 test/postgres.integration.test.mjs",
+    "check": "node --check server.mjs && node --check lib/*.mjs && node --check public/app.js && node --check scripts/*.mjs",
+    "migrate": "node scripts/migrate.mjs"
   },
   "dependencies": {
-    "poseidon-bls12381": "1.0.2",
-    "snarkjs": "^0.7.6",
-    "zk-tele-auth": "github:EF-Code/zk-tele-auth"
+    "pg": "^8.23.0",
+    "zk-tele-auth": "git+https://github.com/EF-Code/zk-tele-auth.git#e50efa26ce54c940b138885a9aac40ee7ed00206"
+  },
+  "overrides": {
+    "bfj": "^9.1.3",
+    "underscore": "^1.13.8"
+  },
+  "allowScripts": {
+    "git+https://github.com/EF-Code/zk-tele-auth.git#e50efa26ce54c940b138885a9aac40ee7ed00206": true
   },
   "engines": {
-    "node": ">=18"
+    "node": ">=20 <27"
   },
   "license": "MIT"
 }
