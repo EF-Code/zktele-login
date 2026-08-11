@@ -2,7 +2,9 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createAuthService } from '../lib/auth-service.mjs';
 import { deriveActionIssuerSecret } from '../lib/auth-service.mjs';
+import { createGatewayKeys, publicKeyPem, signAttestation } from '../lib/attestation.mjs';
 import { loadConfig } from '../lib/config.mjs';
+import { createRelyingService } from '../lib/relying-service.mjs';
 import { signTelegramInitData } from '../lib/telegram.mjs';
 import { ZkAuthProofGenerator } from 'zk-tele-auth/dist/sdk/proof-generator.js';
 import { ZkAuthProofVerifier } from 'zk-tele-auth/dist/sdk/proof-verifier.js';
@@ -83,4 +85,39 @@ test('a public-artifact proof with the wrong issuer secret is rejected by the pi
   });
   assert.equal(result.isValid, false);
   assert.match(result.error, /issuerKeyHash|authorized issuer/);
+
+  const gatewayKeys = createGatewayKeys();
+  const relying = createRelyingService({
+    keyId: config.keyId,
+    issuer: config.issuer,
+    audience: config.audience,
+    appDomain: config.appDomain,
+    actionId: config.actionId,
+    circuitId: config.circuitId,
+    circuitVersion: config.circuitVersion,
+    artifactSetId: config.artifactSetId,
+    issuerKeyHash: expectedIssuerKeyHash,
+    maxAuthAgeSec: config.maxAuthAgeSec,
+    proofTtlSec: config.proofTtlSec,
+    requirePremium: config.requirePremium,
+    gatewayPublicKeys: { [config.keyId]: publicKeyPem(gatewayKeys.publicKey) },
+  }, { clock: () => now });
+  const forgedAttestation = signAttestation({
+    keyId: config.keyId,
+    issuer: config.issuer,
+    audience: config.audience,
+    appDomain: config.appDomain,
+    actionId: config.actionId,
+    challenge: 'forge-challenge',
+    issuedAt: now,
+    expiresAt: now + config.proofTtlSec,
+    circuitId: config.circuitId,
+    circuitVersion: config.circuitVersion,
+    artifactSetId: config.artifactSetId,
+    issuerKeyHash: expectedIssuerKeyHash,
+    proofPayload: forged,
+  }, gatewayKeys.privateKey);
+  const productionVerification = await relying.verify(forgedAttestation);
+  assert.equal(productionVerification.isValid, false);
+  assert.match(productionVerification.error, /issuer(?:KeyHash| policy)|authorized issuer/);
 });
