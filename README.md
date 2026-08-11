@@ -117,6 +117,8 @@ docker build --tag zktele-login:local .
 reports p95 latency, failures, heap delta, and proof-gate occupancy. It does
 not claim a production proof-throughput result; valid-proof flooding still
 requires a staging environment with real resource limits and telemetry.
+The test runner uses `--test-force-exit` only after all assertions complete
+because the upstream Groth16 worker pool does not close its event-loop handles.
 
 The dependency is pinned to the issuer-bound upstream revision
 `e50efa26ce54c940b138885a9aac40ee7ed00206` over credential-free HTTPS. Root
