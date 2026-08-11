@@ -3,63 +3,62 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>zktele-login — anonymous Telegram login</title>
+  <title>zktele-login — private Telegram authentication</title>
+  <script src="https://telegram.org/js/telegram-web-app.js?63"></script>
   <link rel="stylesheet" href="/style.css" />
 </head>
 <body>
   <main>
     <header>
       <h1>zktele-login</h1>
-      <p class="tagline">Log in with Telegram — <strong>nobody sees your ID</strong>.</p>
+      <p class="tagline">Telegram-backed access with a scoped anonymous nullifier.</p>
     </header>
 
     <section class="card">
-      <h2>Who are you logging in as?</h2>
-      <p class="hint">Each button simulates Telegram opening your MiniApp for that identity. The <em>gateway</em> validates the signed initData, then emits a zero-knowledge proof. Your <code>userId</code> never leaves the gateway.</p>
-      <div id="identities" class="identities"></div>
-      <button id="replay" class="ghost" disabled>Replay last login (tampered proof)</button>
+      <h2>Authenticate</h2>
+      <p class="hint">Telegram supplies signed Mini App data. The gateway validates it, generates a zero-knowledge proof, and signs the proof envelope. The relying app receives a nullifier, not your Telegram profile.</p>
+      <button id="telegram-login">Authenticate current Telegram session</button>
+      <p id="telegram-help" class="hint"></p>
+      <div id="dev-panel" class="hidden">
+        <p class="dev-label">Development simulation</p>
+        <div id="identities" class="identities"></div>
+      </div>
+      <button id="tamper" class="ghost" disabled>Tamper with the last attestation</button>
     </section>
 
     <section id="result" class="card hidden">
-      <h2>Login result</h2>
+      <h2>Authentication result</h2>
       <div id="status" class="status"></div>
       <dl id="detail"></dl>
-      <button id="cross-domain" class="ghost" disabled>Verify last proof against another app domain</button>
+      <button id="cross-domain" class="ghost" disabled>Verify against another app domain</button>
     </section>
 
     <section class="card">
-      <h2>Claim this session</h2>
-      <p class="hint">The app keeps a registry of <em>claimed nullifiers</em> — like a "one account = one thing" ledger. A nullifier can only be claimed once; replaying it is rejected.</p>
-      <button id="claim" class="ghost" disabled>Claim last login</button>
-      <button id="reclaim" class="ghost" disabled>Try to claim it again (replay)</button>
+      <h2>Claim this action</h2>
+      <p class="hint">The nullifier is stable for one Telegram account, app, and action. That permits one claim for this action without exposing a reusable cross-app identifier.</p>
+      <button id="claim" class="ghost" disabled>Claim current action</button>
+      <button id="reclaim" class="ghost" disabled>Try the same claim again</button>
       <div id="claim-result" class="status hidden"></div>
-    </section>
-
-    <section class="card">
-      <h2>Allowlist membership</h2>
-      <p class="hint">Prove you're on a private list — without revealing who you are. The app only commits to a <em>root</em> hash; your <code>userId</code> stays hidden even inside the revealed leaf (<code>leaf = Poseidon(userId, 1)</code>).</p>
-      <div id="membership-actions" class="identities"></div>
-      <div id="membership-result" class="status hidden"></div>
     </section>
 
     <section class="card">
       <h2>Session log</h2>
       <table id="log">
         <thead>
-          <tr><th>Attempt</th><th>Identity (client-side only)</th><th>Nullifier</th><th>Verified</th></tr>
+          <tr><th>Attempt</th><th>Source</th><th>Nullifier</th><th>Result</th></tr>
         </thead>
         <tbody></tbody>
       </table>
     </section>
 
     <section class="card">
-      <h2>Why this is anonymous &amp; Sybil-resistant</h2>
+      <h2>Security boundary</h2>
       <ul>
-        <li><strong>Anonymity</strong> — the only value a dApp ever learns is a <code>nullifier</code>. The server response above contains no <code>userId</code>, name, or photo — they never leave the gateway.</li>
-        <li><strong>Unlinkability</strong> — every login mints a <em>fresh</em> nullifier (a random salt is mixed in), so not even a server holding your full history can tell two logins belong to the same person.</li>
-        <li><strong>Sybil-resistance</strong> — a proof can only be minted for a real, bot-signed Telegram session (the HMAC check happens inside the gateway), so identities can't be forged for free.</li>
-        <li><strong>Freshness</strong> — the proof carries a timestamp; replayed, stale, or tampered proofs are rejected (try the replay button).</li>
-        <li><strong>Domain binding</strong> — the app domain is hashed into the circuit, so a proof minted for this demo can't be replayed on another app.</li>
+        <li><strong>Telegram authenticity</strong> — the gateway checks Telegram's HMAC and freshness before issuing anything.</li>
+        <li><strong>Issuer authenticity</strong> — relying apps require an Ed25519 signature from the configured gateway; an arbitrary Groth16 proof is not accepted.</li>
+        <li><strong>Scoped deduplication</strong> — the same Telegram account produces the same nullifier only for this app and action.</li>
+        <li><strong>Privacy boundary</strong> — the gateway necessarily sees Telegram identity while validating it. Relying apps can operate on the signed nullifier instead.</li>
+        <li><strong>Domain and policy binding</strong> — the gateway signature covers the domain, action, expiry policy, and full proof payload.</li>
       </ul>
     </section>
   </main>

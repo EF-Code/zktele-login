@@ -1,253 +1,233 @@
-const IDENTITIES = [
-  { label: 'You — premium', userId: 1001, isPremium: true },
-  { label: 'You — free', userId: 1001, isPremium: false },
-  { label: 'Someone else — premium', userId: 987654321, isPremium: true },
-  { label: 'Someone else — free', userId: 987654321, isPremium: false },
+const DEV_IDENTITIES = [
+  { label: 'Member 1001 — premium', userId: 1001, isPremium: true },
+  { label: 'Member 1001 — free', userId: 1001, isPremium: false },
+  { label: 'Member 987654321 — premium', userId: 987654321, isPremium: true },
 ];
-
-const APP_DOMAIN = 'zktele-login.demo';
 
 const state = {
   attempts: 0,
-  lastProofPayload: null,
-  seenUsers: new Map(),
+  config: null,
+  lastAttestation: null,
 };
 
-const $ = (sel) => document.querySelector(sel);
+const select = (selector) => document.querySelector(selector);
 
-function renderIdentities() {
-  const container = $('#identities');
-  container.innerHTML = '';
-  for (const identity of IDENTITIES) {
-    const btn = document.createElement('button');
-    btn.textContent = `Log in as: ${identity.label}`;
-    btn.className = 'identity';
-    btn.addEventListener('click', () => login(identity));
-    container.appendChild(btn);
+async function requestJson(url, { method = 'GET', body } = {}) {
+  const options = { method, headers: {}, credentials: 'same-origin' };
+  if (body !== undefined) {
+    options.headers['Content-Type'] = 'application/json';
+    options.body = JSON.stringify(body);
   }
-}
-
-async function post(url, body) {
-  const res = await fetch(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
-  });
-  const json = await res.json();
-  if (!res.ok) {
-    const err = new Error(json.error || `HTTP ${res.status}`);
-    err.payload = json;
-    throw err;
-  }
-  return json;
-}
-
-function shortHash(hex) {
-  if (!hex) return '';
-  return hex.length > 24 ? `${hex.slice(0, 12)}…${hex.slice(-12)}` : hex;
-}
-
-async function login(identity) {
-  const result = $('#result');
-  result.classList.remove('hidden');
-  setStatus('working', 'Authenticating… (generating BLS12-381 proof)');
-  $('#detail').innerHTML = '';
-
+  const response = await fetch(url, options);
+  let payload;
   try {
-    const { initData } = await post('/api/init', {
-      userId: identity.userId,
-      isPremium: identity.isPremium,
-    });
-
-    const auth = await post('/api/authenticate', { initData });
-    const verification = await post('/api/verify', {
-      proofPayload: auth.proofPayload,
-    });
-
-    state.lastProofPayload = auth.proofPayload;
-    state.attempts += 1;
-
-    const nullifier = verification.nullifierHash || auth.nullifierHash;
-    const seen = state.seenUsers.get(identity.userId);
-    state.seenUsers.set(identity.userId, (seen || 0) + 1);
-
-    if (verification.isValid) {
-      setStatus('ok', `Login verified — valid Groth16 proof`);
-    } else {
-      setStatus('error', `Login FAILED: ${verification.error}`);
-    }
-
-    $('#detail').innerHTML = `
-      <div class="row"><dt>Identity</dt><dd>${identity.label} <span class="dim">(known only to this page)</span></dd></div>
-      <div class="row"><dt>Nullifier</dt><dd class="mono">${shortHash(nullifier)}</dd></div>
-      ${
-        seen
-          ? `<div class="row"><dt>Same user before?</dt><dd>Yes, but this is a <em>fresh</em> nullifier → the two logins are <strong>unlinkable</strong> server-side.</dd></div>`
-          : `<div class="row"><dt>Same user before?</dt><dd>No — first time this identity logged in.</dd></div>`
-      }
-      <div class="row"><dt>appDomainHash</dt><dd class="mono dim">${shortHash(verification.appDomainHash || auth.proofPayload.appDomainHash)}</dd></div>
-      <div class="row"><dt>Timestamp</dt><dd>${new Date((auth.proofPayload.timestamp || 0) * 1000).toISOString()}</dd></div>
-      <div class="row"><dt>Proof size</dt><dd>${proofSize(auth.proofPayload.proof)}</dd></div>
-      <div class="row"><dt>Server received</dt><dd><pre class="mono dim">${JSON.stringify({ ...auth, proofPayload: '…' }, null, 2)}</pre></dd></div>
-      <div class="row"><dt>Proof public signals</dt><dd><pre class="mono dim">${JSON.stringify(auth.proofPayload.publicSignals, null, 2)}</pre></dd></div>
-    `;
-
-    addLogRow(identity, nullifier, true);
-    $('#replay').disabled = false;
-    $('#claim').disabled = false;
-    $('#cross-domain').disabled = false;
-    $('#claim-result').classList.add('hidden');
-  } catch (err) {
-    setStatus('error', err.message || String(err));
-    addLogRow(identity, null, false, err.message);
+    payload = await response.json();
+  } catch {
+    throw new Error(`HTTP ${response.status}: invalid server response`);
   }
+  if (!response.ok) {
+    const error = new Error(payload.error || `HTTP ${response.status}`);
+    error.payload = payload;
+    throw error;
+  }
+  return payload;
+}
+
+function shortHash(value) {
+  if (!value) return '';
+  return value.length > 28 ? `${value.slice(0, 14)}…${value.slice(-14)}` : value;
+}
+
+function setStatus(kind, message) {
+  const status = select('#status');
+  status.className = `status ${kind}`;
+  status.textContent = message;
+}
+
+function appendDetail(label, content, { monospace = false } = {}) {
+  const wrapper = document.createElement('div');
+  wrapper.className = 'row';
+  const term = document.createElement('dt');
+  term.textContent = label;
+  const description = document.createElement('dd');
+  if (monospace) description.className = 'mono';
+  if (content instanceof Node) description.appendChild(content);
+  else description.textContent = content;
+  wrapper.append(term, description);
+  select('#detail').appendChild(wrapper);
+}
+
+function addLogRow(source, nullifier, success, message = '') {
+  state.attempts += 1;
+  const row = document.createElement('tr');
+  const values = [
+    `#${state.attempts}`,
+    source,
+    nullifier ? shortHash(nullifier) : '—',
+    success ? 'VALID' : message || 'INVALID',
+  ];
+  values.forEach((value, index) => {
+    const cell = document.createElement('td');
+    cell.textContent = value;
+    if (index === 2) cell.className = 'mono';
+    if (index === 3) cell.className = success ? 'ok' : 'err';
+    row.appendChild(cell);
+  });
+  select('#log tbody').prepend(row);
 }
 
 function proofSize(proof) {
-  try {
-    const kb = Math.round(JSON.stringify(proof).length / 1024);
-    return `${kb} KB`;
-  } catch {
-    return '?';
-  }
+  return `${Math.max(1, Math.round(JSON.stringify(proof).length / 1024))} KB`;
 }
 
-function addLogRow(identity, nullifier, ok, error = '') {
-  const tbody = $('#log tbody');
-  const tr = document.createElement('tr');
-  tr.innerHTML = `
-    <td>#${state.attempts}</td>
-    <td>${identity.label}</td>
-    <td class="mono">${nullifier ? shortHash(nullifier) : '—'}</td>
-    <td class="${ok ? 'ok' : 'err'}">${ok ? 'VALID' : error || 'INVALID'}</td>
-  `;
-  tbody.prepend(tr);
-}
-
-function setStatus(kind, text) {
-  $('#status').className = `status ${kind}`;
-  $('#status').textContent = text;
-}
-
-async function claimOnce() {
-  if (!state.lastProofPayload) return;
-  const out = $('#claim-result');
-  out.classList.remove('hidden');
-  out.className = 'status working';
-  out.textContent = 'Claiming this nullifier…';
+async function authenticate(initData, source) {
+  select('#result').classList.remove('hidden');
+  select('#detail').replaceChildren();
+  setStatus('working', 'Validating Telegram data and generating proof…');
   try {
-    const res = await post('/api/claim', { proofPayload: state.lastProofPayload });
-    out.className = 'status ok';
-    out.textContent = `Claimed! This nullifier is now spoken for (${res.claims} total claims).`;
-    $('#reclaim').disabled = false;
-  } catch (err) {
-    out.className = 'status error';
-    out.textContent = `Claim rejected: ${err.message}`;
-  }
-}
-
-$('#claim').addEventListener('click', claimOnce);
-
-$('#reclaim').addEventListener('click', async () => {
-  if (!state.lastProofPayload) return;
-  const out = $('#claim-result');
-  out.classList.remove('hidden');
-  out.className = 'status working';
-  out.textContent = 'Re-submitting the same proof…';
-  try {
-    const res = await post('/api/claim', { proofPayload: state.lastProofPayload });
-    out.className = 'status error';
-    out.textContent = `Unexpected: claim succeeded again (${res.claims})! This should never happen.`;
-  } catch (err) {
-    out.className = 'status ok';
-    out.textContent = `Replay rejected: ${err.message}`;
-  }
-});
-
-$('#cross-domain').addEventListener('click', async () => {
-  if (!state.lastProofPayload) return;
-  setStatus('working', 'Verifying this proof against another app domain…');
-  try {
-    const verification = await post('/api/verify', {
-      proofPayload: state.lastProofPayload,
-      appDomain: 'evil.example',
+    const challenge = await requestJson('/api/challenge');
+    const gatewayBase = state.config.gatewayOrigin || '';
+    const attestPath = gatewayBase ? `${gatewayBase}/v1/attest` : '/api/authenticate';
+    const { attestation } = await requestJson(attestPath, {
+      method: 'POST',
+      body: {
+        initData,
+        challenge: challenge.challenge,
+        audience: challenge.audience,
+        appDomain: challenge.appDomain,
+        actionId: challenge.actionId,
+      },
     });
-    setStatus(
-      verification.isValid ? 'error' : 'ok',
-      verification.isValid
-        ? 'Proof accepted for another domain?! This should never happen.'
-        : `Cross-domain proof rejected: ${verification.error}`
-    );
-    addLogRow({ label: `Cross-domain (${APP_DOMAIN} → evil.example)` }, null, false, verification.error || 'rejected');
-  } catch (err) {
-    setStatus('ok', `Cross-domain proof rejected: ${err.message}`);
-    addLogRow({ label: `Cross-domain (${APP_DOMAIN} → evil.example)` }, null, false, err.message);
-  }
-});
-
-$('#replay').addEventListener('click', async () => {
-  if (!state.lastProofPayload) return;
-  setStatus('working', 'Replaying a previously issued proof…');
-  try {
-    const tampered = structuredClone(state.lastProofPayload);
-    tampered.proof.pi_a[0] = '0xdeadbeef';
-    const verification = await post('/api/verify', { proofPayload: tampered });
-    setStatus(
-      verification.isValid ? 'error' : 'ok',
-      verification.isValid
-        ? 'Tampered proof VERIFIED?! This should never happen.'
-        : `Tampered proof rejected: ${verification.error}`
-    );
-    addLogRow({ label: 'Replay (tampered)' }, null, false, verification.error || 'rejected');
-  } catch (err) {
-    setStatus('ok', `Replay rejected: ${err.message}`);
-    addLogRow({ label: 'Replay (tampered)' }, null, false, err.message);
-  }
-});
-
-async function loadAllowlist() {
-  const info = await post('/api/membership', {});
-  const container = $('#membership-actions');
-  container.innerHTML = '';
-  for (const memberId of info.members) {
-    const btn = document.createElement('button');
-    btn.className = 'identity';
-    btn.textContent = `Prove I'm on the list (member #${memberId})`;
-    btn.addEventListener('click', () => membershipProve(memberId));
-    container.appendChild(btn);
-  }
-  const outsider = document.createElement('button');
-  outsider.className = 'identity';
-  outsider.textContent = `Prove I'm on the list (outsider #99999)`;
-  outsider.addEventListener('click', () => membershipProve(99999));
-  container.appendChild(outsider);
-  return info;
-}
-
-async function membershipProve(memberId) {
-  const out = $('#membership-result');
-  out.classList.remove('hidden');
-  out.className = 'status working';
-  out.textContent = 'Generating membership proof…';
-
-  try {
-    const prove = await post('/api/membership/prove', { memberId });
-    const verification = await post('/api/membership/verify', {
-      proofPayload: prove.proofPayload,
+    const verification = await requestJson('/api/verify', {
+      method: 'POST',
+      body: { attestation },
     });
+    if (!verification.isValid) throw new Error(verification.error || 'verification failed');
 
-    out.className = verification.isValid ? 'status ok' : 'status error';
-    out.innerHTML = verification.isValid
-      ? `<strong>On the allowlist.</strong> The app accepts this proof but only ever sees:<br>
-         <span class="mono dim">leaf = ${shortHash(verification.leaf)}</span> ·
-         <span class="mono dim">root = ${shortHash(verification.root)}</span><br>
-         Your <code>userId</code> and sibling path stay private.`
-      : `Not on the allowlist: ${verification.error}`;
-  } catch (err) {
-    out.className = 'status error';
-    out.textContent = `Membership check failed: ${err.message}`;
+    state.lastAttestation = attestation;
+    setStatus('ok', 'Telegram session and gateway-attested proof verified');
+    appendDetail('Source', source);
+    appendDetail('Nullifier', shortHash(verification.nullifierHash), { monospace: true });
+    appendDetail('Issuer', verification.issuer);
+    appendDetail('Action', verification.actionId);
+    appendDetail('Expires', new Date(verification.expiresAt * 1000).toISOString());
+    appendDetail('Gateway key', shortHash(state.config.gatewayPublicKeyFingerprint), { monospace: true });
+    appendDetail('Proof size', proofSize(attestation.proofPayload.proof));
+
+    const signals = document.createElement('pre');
+    signals.className = 'mono dim';
+    signals.textContent = JSON.stringify(attestation.proofPayload.publicSignals, null, 2);
+    appendDetail('Public signals', signals);
+
+    addLogRow(source, verification.nullifierHash, true);
+    select('#tamper').disabled = false;
+    select('#claim').disabled = false;
+    select('#cross-domain').disabled = false;
+    select('#claim-result').classList.add('hidden');
+  } catch (error) {
+    setStatus('error', error.message || String(error));
+    addLogRow(source, null, false, error.message);
   }
 }
 
-renderIdentities();
-loadAllowlist();
+function telegramInitData() {
+  const telegram = globalThis.Telegram;
+  const webApp = telegram && typeof telegram === 'object' ? telegram.WebApp : null;
+  if (!webApp || typeof webApp.initData !== 'string' || !webApp.initData) return '';
+  if (typeof webApp.ready === 'function') webApp.ready();
+  return webApp.initData;
+}
+
+select('#telegram-login').addEventListener('click', async () => {
+  const initData = telegramInitData();
+  if (!initData) {
+    setStatus('error', 'No Telegram Mini App session is available. Open this page through the configured bot.');
+    select('#result').classList.remove('hidden');
+    return;
+  }
+  await authenticate(initData, 'Telegram Mini App');
+});
+
+select('#tamper').addEventListener('click', async () => {
+  if (!state.lastAttestation) return;
+  const tampered = structuredClone(state.lastAttestation);
+  tampered.proofPayload.proof.pi_a[0] = '1';
+  const verification = await requestJson('/api/verify', {
+    method: 'POST',
+    body: { attestation: tampered },
+  });
+  const rejected = !verification.isValid;
+  setStatus(rejected ? 'ok' : 'error', rejected
+    ? `Tampered attestation rejected: ${verification.error}`
+    : 'Tampered attestation was unexpectedly accepted');
+  addLogRow('Tampered attestation', null, false, verification.error || 'unexpectedly accepted');
+});
+
+select('#cross-domain').addEventListener('click', async () => {
+  if (!state.lastAttestation) return;
+  const verification = await requestJson('/api/verify', {
+    method: 'POST',
+    body: { attestation: state.lastAttestation, appDomain: 'other.example' },
+  });
+  const rejected = !verification.isValid;
+  setStatus(rejected ? 'ok' : 'error', rejected
+    ? `Cross-domain use rejected: ${verification.error}`
+    : 'Cross-domain use was unexpectedly accepted');
+  addLogRow('Cross-domain verification', null, false, verification.error || 'unexpectedly accepted');
+});
+
+async function claim() {
+  if (!state.lastAttestation) return;
+  const output = select('#claim-result');
+  output.classList.remove('hidden');
+  output.className = 'status working';
+  output.textContent = 'Submitting claim…';
+  try {
+    const result = await requestJson('/api/claim', {
+      method: 'POST',
+      body: { attestation: state.lastAttestation },
+    });
+    output.className = 'status ok';
+    output.textContent = `Claim accepted (${result.claims} total claims).`;
+    select('#reclaim').disabled = false;
+  } catch (error) {
+    output.className = 'status error';
+    output.textContent = `Claim rejected: ${error.message}`;
+  }
+}
+
+select('#claim').addEventListener('click', claim);
+select('#reclaim').addEventListener('click', claim);
+
+async function enableDevelopmentSimulation() {
+  const panel = select('#dev-panel');
+  panel.classList.remove('hidden');
+  const container = select('#identities');
+  for (const identity of DEV_IDENTITIES) {
+    const button = document.createElement('button');
+    button.className = 'identity';
+    button.textContent = `Simulate: ${identity.label}`;
+    button.addEventListener('click', async () => {
+      const { initData } = await requestJson('/api/dev/init', {
+        method: 'POST',
+        body: { userId: identity.userId, isPremium: identity.isPremium },
+      });
+      await authenticate(initData, identity.label);
+    });
+    container.appendChild(button);
+  }
+}
+
+async function initialize() {
+  state.config = await requestJson('/api/config');
+  const telegramData = telegramInitData();
+  select('#telegram-help').textContent = telegramData
+    ? 'Telegram session detected and ready to authenticate.'
+    : 'Open through the configured Telegram bot. Local simulation is available only in development mode.';
+  if (state.config.devSimulationEnabled) await enableDevelopmentSimulation();
+}
+
+initialize().catch((error) => {
+  select('#result').classList.remove('hidden');
+  setStatus('error', `Application initialization failed: ${error.message}`);
+});
