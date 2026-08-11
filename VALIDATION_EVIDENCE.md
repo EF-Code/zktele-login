@@ -40,6 +40,11 @@ recorded.
   The image runs as `node`, excludes tests, Git metadata, local env files, and
   the handoff, and passed read-only/capability-dropped liveness, readiness, and
   Docker health checks.
+- The provider-neutral Compose stack passed a fresh local build, PostgreSQL
+  17.5 health, both migrations, and application readiness. Its development
+  fixture flow completed verification, login/session, and claim in the
+  containerized app. This stack intentionally uses combined development
+  simulation and is not a production split deployment.
 - Same-image restart drill against PostgreSQL preserved an authenticated
   server-side session after restart.
 - The supplied staging bot token was read only from the local ignored secret
