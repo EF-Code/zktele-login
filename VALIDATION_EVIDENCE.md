@@ -42,6 +42,10 @@ recorded.
   Docker health checks.
 - Same-image restart drill against PostgreSQL preserved an authenticated
   server-side session after restart.
+- The supplied staging bot token was read only from the local ignored secret
+  file with mode `600`; Telegram `getMe` succeeded, and the gateway accepted a
+  fixture HMAC made with that token before generating a real Groth16
+  attestation. No bot identity or token value is recorded here.
 - Logical backup/restore passed with matching PostgreSQL 16 client/server
   tools. Restored challenge race, claim, session, and row-count invariants
   passed. The latest disposable dump was 11,970 bytes with recorded SHA-256
