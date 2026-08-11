@@ -39,6 +39,7 @@ jobs:
       - run: npm run check
       - run: npm test
       - run: npm run test:load
+      - run: npm run test:proof-load
       - run: npm run test:postgres
         env:
           DATABASE_URL: postgresql://zktele:test-only@127.0.0.1:5432/zktele

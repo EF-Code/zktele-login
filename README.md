@@ -59,7 +59,8 @@ The full variable list is in [.env.example](/home/wellington/stuff/zktele-login/
 Run migrations before starting the runtime user:
 
 ```sh
-DATABASE_URL='postgresql://migration-user@db/zktele' npm run migrate
+NODE_ENV=production DATABASE_URL='postgresql://migration-user@db/zktele' \
+  DATABASE_SSL=true DATABASE_CA_FILE=/run/secrets/postgres-ca.pem npm run migrate
 NODE_ENV=production SERVICE_ROLE=relying npm start
 ```
 
@@ -115,8 +116,13 @@ docker build --tag zktele-login:local .
 
 `npm run test:load` exercises the bounded challenge/control-plane path and
 reports p95 latency, failures, heap delta, and proof-gate occupancy. It does
-not claim a production proof-throughput result; valid-proof flooding still
-requires a staging environment with real resource limits and telemetry.
+not claim a production proof-throughput result. `npm run test:proof-load`
+starts separate in-process gateway and relying roles, generates HMAC-valid
+synthetic Telegram fixtures, and runs the real Groth16 generator and verifier;
+it reports only aggregate counts and p95 timing. It is a local capacity smoke,
+not evidence of Telegram-client behavior or provider-scale capacity. Valid
+proof flooding still requires a staging environment with real resource limits
+and telemetry.
 The test runner uses `--test-force-exit` only after all assertions complete
 because the upstream Groth16 worker pool does not close its event-loop handles.
 

@@ -4,6 +4,22 @@ This document describes the release sequence without choosing a cloud
 provider. Do not expose the gateway and relying roles through one process in a
 production deployment.
 
+## Hosting compatibility gate
+
+This application requires a Docker- or Node-capable runtime for the gateway
+and relying services, plus PostgreSQL with TLS. InfinityFree's free hosting
+environment does not provide Node.js, Docker, or PostgreSQL, so it cannot host
+these backend roles. An InfinityFree domain may still be used for DNS and a
+static frontend/redirect if its terms and TLS setup meet the product needs;
+the backend and database must run on a separate VPS, container platform, or
+managed services. Do not upload the backend container or database credentials
+to InfinityFree.
+
+Before provider-specific work, record the backend provider, PostgreSQL
+provider/major version, TLS CA/verification method, secret manager, trusted
+proxy topology, and canonical HTTPS origins. No production launch gate is
+green until those external values are verified in the deployed environment.
+
 ## Build and migration
 
 1. Build from the reviewed commit with a clean checkout and `npm ci`.
@@ -16,7 +32,10 @@ production deployment.
    not be a schema owner. Apply [db/runtime-permissions.sql](/home/wellington/stuff/zktele-login/db/runtime-permissions.sql)
    as the database owner with `psql -v runtime_user=... -v app_database=...`.
 5. Perform a restore drill against a disposable database and retain the
-   timestamped evidence.
+   timestamped evidence. Use `pg_dump`/`pg_restore` from the same PostgreSQL
+   major version as the target server (or the provider's native backup tools);
+   client/server major mismatches can make a dump fail during restore even
+   when the database itself is healthy.
 
 ## Gateway
 
@@ -65,3 +84,18 @@ running only backward-compatible migrations, and retaining the active public
 key until every old attestation expires. Revoke a compromised Ed25519 key by
 removing its key ID from the relying allowlist and redeploying. Issuer/nullifier
 secret rotation is a separate migration because it changes nullifier continuity.
+
+### Local evidence versus provider evidence
+
+The repository tests can prove protocol and persistence invariants locally,
+but they do not prove provider networking, managed PostgreSQL TLS, DNS,
+Telegram WebView behavior, or a real release rollback. Retain separate
+staging evidence for those gates:
+
+- container image digest, read-only/rootless smoke output, and health checks;
+- HTTPS header, cookie, CORS, and exact-origin checks through the production
+  proxy;
+- provider-native backup/PITR restore and a rollback to a prior immutable image;
+- the supported Telegram Android, iOS, Desktop, and Web client matrix;
+- load results using genuine proof generation with the chosen CPU/memory
+  limits and an explicit latency/error objective.
