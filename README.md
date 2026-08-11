@@ -68,6 +68,12 @@ is enforced on `(issuer, app_domain, action_id, nullifier_hash)`, and challenge
 consumption plus claim insertion use a transaction when the PostgreSQL store is
 active.
 
+Expired challenges and sessions are removed by a bounded periodic cleanup pass;
+the migration adds the supporting expiry indexes. Set `METRICS_ENABLED=true` to
+enable the private `/health/metrics` Prometheus endpoint. In production it also
+requires a base64-encoded `METRICS_TOKEN` (at least 32 decoded bytes), supplied
+only to the service and scrape configuration.
+
 ## API surface
 
 Relying service:
@@ -75,7 +81,8 @@ Relying service:
 | Route | Purpose |
 | --- | --- |
 | `GET /health/live` | Process liveness |
-| `GET /health/ready` | Readiness boundary |
+| `GET /health/ready` | Readiness boundary (database and production artifacts) |
+| `GET /health/metrics` | Opt-in, token-protected coarse metrics |
 | `GET /api/config` | Public descriptive policy metadata |
 | `GET /api/challenge` | Creates a verifier-owned one-time challenge |
 | `POST /api/auth/complete` | Verifies an attestation and issues a session or claim result |
@@ -87,8 +94,9 @@ Gateway service:
 | Route | Purpose |
 | --- | --- |
 | `GET /health/live` | Process liveness |
-| `GET /health/ready` | Readiness boundary |
+| `GET /health/ready` | Readiness boundary (database and production artifacts) |
 | `POST /v1/attest` | Validates Telegram data and returns a signed attestation |
+| `GET /health/metrics` | Opt-in, token-protected coarse metrics |
 
 `/v1/attest` accepts `initData`, `challenge`, `audience`, `appDomain`, and
 `actionId`. The gateway allowlists all authorization context values against its
@@ -105,6 +113,11 @@ npm audit --omit=dev
 docker build --tag zktele-login:local .
 ```
 
+`npm run test:load` exercises the bounded challenge/control-plane path and
+reports p95 latency, failures, heap delta, and proof-gate occupancy. It does
+not claim a production proof-throughput result; valid-proof flooding still
+requires a staging environment with real resource limits and telemetry.
+
 The dependency is pinned to the issuer-bound upstream revision
 `e50efa26ce54c940b138885a9aac40ee7ed00206` over credential-free HTTPS. Root
 overrides select `bfj@9.1.3` and `underscore>=1.13.8`; the current audit is
@@ -115,7 +128,8 @@ production claim.
 
 The container runs as the unprivileged `node` user. CI uses `npm ci`, the
 issuer-bound proof integration suite, dependency audit, secret scanning, a
-container build, and a health smoke test. Provider-neutral deployment and
+container build, a health smoke test, and a bounded control-plane load smoke
+test. Provider-neutral deployment and
 rollback procedures are in [DEPLOYMENT.md](/home/wellington/stuff/zktele-login/DEPLOYMENT.md)
 and [SECURITY.md](/home/wellington/stuff/zktele-login/SECURITY.md).
 

@@ -12,6 +12,11 @@ success and conflict counts, database pool saturation, process restarts, and
 resource usage. Never use Telegram IDs, nullifiers, challenges, full IPs,
 `initData`, attestations, or session tokens as metric labels.
 
+The optional `/health/metrics` endpoint is disabled by default. When enabled,
+protect it with the production metrics token and expose it only on the private
+monitoring path. Alert on readiness failures, proof rejections/failures,
+database errors, cleanup failures, and sustained proof queue saturation.
+
 During incidents, remove the affected gateway key ID from relying allowlists,
 pause claim traffic, preserve redacted request IDs, and redeploy from a
 reviewed image. Keep the old key available only for the documented attestation

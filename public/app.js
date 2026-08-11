@@ -87,7 +87,7 @@ async function authenticate(initData, source) {
   try {
     const challenge = await requestJson('/api/challenge');
     const gatewayBase = state.config.gatewayOrigin || '';
-    const attestPath = gatewayBase ? `${gatewayBase}/v1/attest` : '/api/authenticate';
+    const attestPath = gatewayBase ? `${gatewayBase}/v1/attest` : '/v1/attest';
     const { attestation } = await requestJson(attestPath, {
       method: 'POST',
       body: {

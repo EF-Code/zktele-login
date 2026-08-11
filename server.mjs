@@ -4,11 +4,13 @@ import * as path from 'path';
 import * as crypto from 'crypto';
 import { fileURLToPath } from 'url';
 import { createAuthService } from './lib/auth-service.mjs';
+import { assertRuntimeArtifacts } from './lib/artifacts.mjs';
 import { createClaimStore } from './lib/claim-store.mjs';
 import { createChallengeStore } from './lib/challenge-store.mjs';
 import { createRelyingService } from './lib/relying-service.mjs';
 import { createSessionStore } from './lib/session-store.mjs';
 import { loadConfig } from './lib/config.mjs';
+import { createMetrics } from './lib/metrics.mjs';
 import { signTelegramInitData } from './lib/telegram.mjs';
 
 const MODULE_DIR = path.dirname(fileURLToPath(import.meta.url));
@@ -26,8 +28,10 @@ class HttpError extends Error {
 class ProofGate {
   #active = 0;
 
-  constructor(limit) {
+  constructor(limit, metrics) {
     this.limit = limit;
+    this.metrics = metrics;
+    this.metrics.setGauge('proof_active', 0);
   }
 
   get active() {
@@ -35,12 +39,23 @@ class ProofGate {
   }
 
   async run(operation) {
-    if (this.#active >= this.limit) throw new HttpError(503, 'proof service is busy; retry later');
+    if (this.#active >= this.limit) {
+      this.metrics.increment('proof_rejections_total');
+      throw new HttpError(503, 'proof service is busy; retry later');
+    }
     this.#active += 1;
+    this.metrics.setGauge('proof_active', this.#active);
+    this.metrics.increment('proof_operations_total');
+    const started = process.hrtime.bigint();
     try {
       return await operation();
+    } catch (error) {
+      this.metrics.increment('proof_failures_total');
+      throw error;
     } finally {
       this.#active -= 1;
+      this.metrics.setGauge('proof_active', this.#active);
+      this.metrics.observe('proof_operation_duration_seconds', Number(process.hrtime.bigint() - started) / 1e9);
     }
   }
 }
@@ -232,8 +247,25 @@ function publicServiceMetadata(config, verifier) {
   };
 }
 
+function metricsAuthorized(req, config, metrics) {
+  if (!config.metricsToken) return true;
+  const header = req.headers.authorization || '';
+  if (!header.startsWith('Bearer ')) return false;
+  return metrics.authorizeToken(header.slice('Bearer '.length), config.metricsToken);
+}
+
+function statusMetric(status) {
+  if (status >= 500) return '5xx';
+  if (status >= 400) return '4xx';
+  if (status >= 300) return '3xx';
+  if (status >= 200) return '2xx';
+  return '1xx';
+}
+
 export async function createApplication(options = {}) {
   const config = options.config || loadConfig();
+  const metrics = options.metrics || createMetrics();
+  await assertRuntimeArtifacts(config);
   const gatewayService = options.authService || (
     config.role === 'gateway' || config.role === 'combined' ? createAuthService(config) : null
   );
@@ -247,11 +279,38 @@ export async function createApplication(options = {}) {
   await claimStore.initialize();
   await challengeStore.initialize();
   await sessionStore.initialize();
-  const proofGate = new ProofGate(config.proofConcurrency);
+  const proofGate = new ProofGate(config.proofConcurrency, metrics);
   const allowRequest = createRateLimiter(config.rateLimitPerMinute);
   let accepting = true;
+  const cleanupIntervalSec = Number.isSafeInteger(config.cleanupIntervalSec) ? config.cleanupIntervalSec : 60;
+  const cleanupInterval = setInterval(async () => {
+    if (!accepting) return;
+    try {
+      const [challenges, sessions] = await Promise.all([
+        challengeStore.cleanupExpired?.(),
+        sessionStore.cleanupExpired?.(),
+      ]);
+      if (Number.isInteger(challenges) && challenges > 0) metrics.increment('expired_challenges_cleaned_total', challenges);
+      if (Number.isInteger(sessions) && sessions > 0) metrics.increment('expired_sessions_cleaned_total', sessions);
+    } catch (error) {
+      metrics.increment('cleanup_failures_total');
+      console.error(JSON.stringify({ event: 'cleanup_failed', errorClass: error?.name || 'Error' }));
+    }
+  }, cleanupIntervalSec * 1_000);
+  cleanupInterval.unref?.();
 
   const server = http.createServer({ maxHeaderSize: 16 * 1024 }, async (req, res) => {
+    const requestStarted = process.hrtime.bigint();
+    let responseRecorded = false;
+    const recordResponse = () => {
+      if (responseRecorded) return;
+      responseRecorded = true;
+      const status = res.statusCode || 500;
+      metrics.increment(`http_responses_${statusMetric(status)}_total`);
+      metrics.observe('http_response_duration_seconds', Number(process.hrtime.bigint() - requestStarted) / 1e9);
+    };
+    res.once('finish', recordResponse);
+    res.once('close', recordResponse);
     setSecurityHeaders(res, config);
     const requestId = crypto.randomBytes(8).toString('hex');
     res.setHeader('X-Request-Id', requestId);
@@ -270,7 +329,7 @@ export async function createApplication(options = {}) {
         }
         throw new HttpError(404, 'not found');
       }
-      if (pathname.startsWith('/api/') || pathname.startsWith('/v1/')) {
+      if (pathname.startsWith('/api/') || pathname.startsWith('/v1/') || pathname === '/health/metrics') {
         if (!allowRequest(clientKey(req))) throw new HttpError(429, 'rate limit exceeded');
       }
 
@@ -279,8 +338,17 @@ export async function createApplication(options = {}) {
         return;
       }
       if (req.method === 'GET' && pathname === '/health/ready') {
-        await Promise.all([claimStore.ping?.(), challengeStore.ping?.(), sessionStore.ping?.()]);
+        await Promise.all([assertRuntimeArtifacts(config), claimStore.ping?.(), challengeStore.ping?.(), sessionStore.ping?.()]);
         sendJson(res, 200, { status: 'ready' });
+        return;
+      }
+      if (req.method === 'GET' && pathname === '/health/metrics') {
+        if (!config.metricsEnabled || !metricsAuthorized(req, config, metrics)) throw new HttpError(404, 'not found');
+        res.writeHead(200, {
+          'Content-Type': 'text/plain; version=0.0.4; charset=utf-8',
+          'Cache-Control': 'no-store',
+        });
+        res.end(metrics.toPrometheus());
         return;
       }
 
@@ -297,6 +365,7 @@ export async function createApplication(options = {}) {
           actionId: config.actionId,
           ttlSec: config.challengeTtlSec,
         });
+        metrics.increment('challenges_created_total');
         sendJson(res, 200, { challenge: challenge.challenge, expiresAt: challenge.expiresAt, audience: config.audience, appDomain: config.appDomain, actionId: config.actionId });
         return;
       }
@@ -325,8 +394,7 @@ export async function createApplication(options = {}) {
       }
       const body = await readJsonBody(req, config.bodyLimitBytes);
 
-      if (pathname === '/v1/attest' || pathname === '/api/authenticate') {
-        if (pathname === '/api/authenticate' && config.role === 'gateway') throw new HttpError(404, 'not found');
+      if (pathname === '/v1/attest') {
         assertFields(body, { required: ['initData', 'challenge'], optional: ['audience', 'appDomain', 'actionId'] });
         const initData = stringField(body, 'initData', { max: 16 * 1024 });
         const challenge = stringField(body, 'challenge', { max: 512 });
@@ -390,9 +458,17 @@ export async function createApplication(options = {}) {
         const operation = body.operation === undefined ? 'claim' : body.operation;
         if (operation !== 'claim' && operation !== 'login') throw new HttpError(400, 'operation must be claim or login');
         if (!originAllowed(req, config)) throw new HttpError(403, 'origin is not allowed');
+        const expected = { audience: config.audience, appDomain: config.appDomain, actionId: config.actionId };
+        if (!body.attestation || typeof body.attestation !== 'object' || Array.isArray(body.attestation) || typeof body.attestation.challenge !== 'string') {
+          throw new HttpError(400, 'attestation challenge required');
+        }
+        const challengeState = await challengeStore.validate?.(body.attestation.challenge, expected);
+        if (challengeState && !challengeState.valid) {
+          metrics.increment('challenge_precheck_failures_total');
+          throw new HttpError(409, challengeState.reason || 'challenge is not available');
+        }
         const verification = await proofGate.run(() => verifierService.verify(body.attestation, config.appDomain));
         if (!verification.isValid) throw new HttpError(401, 'attestation invalid');
-        const expected = { audience: config.audience, appDomain: config.appDomain, actionId: config.actionId };
         if (operation === 'claim') {
           const result = typeof claimStore.completeClaim === 'function'
             ? await claimStore.completeClaim(verification.nullifierHash, { issuer: verification.issuer, appDomain: config.appDomain, actionId: verification.actionId }, { challengeStore, challenge: verification.challenge, expected })
@@ -402,15 +478,19 @@ export async function createApplication(options = {}) {
               return { ...(await claimStore.claim(verification.nullifierHash, { issuer: verification.issuer, appDomain: config.appDomain, actionId: verification.actionId })), challengeConsumed: true };
             })();
           if (!result.challengeConsumed) throw new HttpError(409, result.challengeReason || 'challenge already used');
+          metrics.increment('challenges_consumed_total');
           if (!result.claimed) {
+            metrics.increment('claim_conflicts_total');
             sendJson(res, 409, { claimed: false, claims: result.claims, error: 'this account already completed this action' });
             return;
           }
+          metrics.increment('claims_succeeded_total');
           sendJson(res, 200, { claimed: true, claims: result.claims });
           return;
         }
         const consumed = await challengeStore.consume(verification.challenge, expected);
         if (!consumed.consumed) throw new HttpError(409, consumed.reason || 'challenge already used');
+        metrics.increment('challenges_consumed_total');
         const session = await sessionStore.create({
           nullifierHash: verification.nullifierHash,
           issuer: verification.issuer,
@@ -419,6 +499,7 @@ export async function createApplication(options = {}) {
           idleTtlSec: config.sessionIdleTtlSec,
           absoluteTtlSec: config.sessionAbsoluteTtlSec,
         });
+        metrics.increment('sessions_created_total');
         setSessionCookie(res, session.token, config);
         sendJson(res, 200, { authenticated: true, expiresAt: session.expiresAt });
         return;
@@ -429,6 +510,7 @@ export async function createApplication(options = {}) {
         if (!originAllowed(req, config)) throw new HttpError(403, 'origin is not allowed');
         const token = parseCookies(req.headers.cookie).get(config.production ? SESSION_COOKIE : 'zktele_session');
         if (token) await sessionStore.revoke(token);
+        metrics.increment('sessions_revoked_total');
         clearSessionCookie(res, config);
         sendJson(res, 200, { loggedOut: true });
         return;
@@ -453,6 +535,7 @@ export async function createApplication(options = {}) {
 
   async function close() {
     accepting = false;
+    clearInterval(cleanupInterval);
     if (server.listening) {
       await new Promise((resolve, reject) => {
         const timeout = setTimeout(() => reject(new Error('server shutdown timed out')), 10_000);
@@ -462,7 +545,7 @@ export async function createApplication(options = {}) {
     await Promise.all([claimStore.close(), challengeStore.close(), sessionStore.close()]);
   }
 
-  return { server, close, config, authService: gatewayService, relyingService: verifierService, claimStore, challengeStore, sessionStore, proofGate };
+  return { server, close, config, authService: gatewayService, relyingService: verifierService, claimStore, challengeStore, sessionStore, proofGate, metrics };
 }
 
 async function main() {

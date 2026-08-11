@@ -13,7 +13,8 @@ production deployment.
    `.env` files, keys, Git metadata, tests, or deployment handoff notes.
 4. Run `npm run migrate` once with the separate migration credential. The
    runtime role must have DML access only to the application tables and must
-   not be a schema owner.
+   not be a schema owner. Apply [db/runtime-permissions.sql](/home/wellington/stuff/zktele-login/db/runtime-permissions.sql)
+   as the database owner with `psql -v runtime_user=... -v app_database=...`.
 5. Perform a restore drill against a disposable database and retain the
    timestamped evidence.
 
@@ -38,6 +39,13 @@ Terminate TLS at a controlled edge, configure the edge body/request limits and
 distributed rate limiter, and document the exact proxy trust behavior before
 enabling any forwarded-address logic. Preserve the application CSP and do not
 use wildcard CORS with credentials.
+
+If metrics are enabled, keep `/health/metrics` private to the monitoring
+network and send `Authorization: Bearer <base64 METRICS_TOKEN>`. The endpoint
+contains only coarse counters, gauges, and latency buckets; never add identity,
+challenge, nullifier, IP, or token labels. The built-in cleanup pass is bounded
+to 1,000 expired rows per interval, so schedule an operational database job or
+increase capacity separately if backlog metrics show sustained growth.
 
 ## Staging and rollback
 

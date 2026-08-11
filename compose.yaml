@@ -39,6 +39,11 @@ services:
       DATABASE_SSL: "false"
       ALLOW_DEV_INIT: "true"
       PORT: "3000"
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/health/ready').then((r) => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"]
+      interval: 10s
+      timeout: 3s
+      retries: 12
     ports:
       - "3000:3000"
 
