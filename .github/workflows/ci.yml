@@ -31,6 +31,10 @@ jobs:
         with:
           node-version-file: .nvmrc
           cache: npm
+      - name: Enforce credential-free Git dependency transport
+        run: |
+          git config --global url."https://github.com/".insteadOf "ssh://git@github.com/"
+          git config --global url."https://github.com/".insteadOf "git@github.com:"
       - run: npm ci --no-audit --no-fund
       - run: npm run check
       - run: npm test

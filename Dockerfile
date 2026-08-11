@@ -1,7 +1,12 @@
 FROM node:24.7.0-bookworm-slim AS build
 
 WORKDIR /app
-COPY package.json package-lock.json ./
+COPY package.json package-lock.json .npmrc ./
+RUN apt-get update \
+  && apt-get install --no-install-recommends --yes git ca-certificates \
+  && rm -rf /var/lib/apt/lists/* \
+  && git config --global url."https://github.com/".insteadOf "ssh://git@github.com/" \
+  && git config --global url."https://github.com/".insteadOf "git@github.com:"
 RUN npm ci --no-audit --no-fund \
   && npm prune --omit=dev
 COPY . .

@@ -121,7 +121,9 @@ requires a staging environment with real resource limits and telemetry.
 The dependency is pinned to the issuer-bound upstream revision
 `e50efa26ce54c940b138885a9aac40ee7ed00206` over credential-free HTTPS. Root
 overrides select `bfj@9.1.3` and `underscore>=1.13.8`; the current audit is
-clean. `test/artifact-provenance.test.mjs` verifies the exact Telegram-auth
+clean. `.npmrc` permits only the root Git dependency, while CI and the build
+stage rewrite any accidental GitHub SSH transport to HTTPS.
+`test/artifact-provenance.test.mjs` verifies the exact Telegram-auth
 WASM, R1CS, proving-key, and verification-key hashes copied from that pinned
 revision. Review the trusted setup and circuit independently before any
 production claim.
