@@ -27,8 +27,8 @@ test('relying verifier requires the pinned key id and issuer policy', async () =
   const verifier = createRelyingService(relyingConfig, {
     verifyProof: async (_payload, policy) => ({
       isValid: true,
-      nullifierHash: 'n',
-      appDomainHash: 'h',
+      nullifierHash: '1',
+      appDomainHash: '1',
       issuerKeyHash: policy.expectedIssuerKeyHash,
     }),
     clock: () => 1_000,

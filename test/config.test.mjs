@@ -75,3 +75,31 @@ test('relying configuration does not accept gateway secrets and pins public poli
     TELEGRAM_BOT_TOKEN: 'should-not-be-here',
   }), /must not receive gateway private secrets/);
 });
+
+test('metrics are disabled by default and require a strong production token when enabled', () => {
+  const development = loadConfig({ NODE_ENV: 'development', ALLOW_DEV_INIT: 'true' });
+  assert.equal(development.metricsEnabled, false);
+  assert.equal(development.metricsToken, null);
+
+  const base = {
+    NODE_ENV: 'production',
+    SERVICE_ROLE: 'gateway',
+    ENVIRONMENT_ID: 'production',
+    APP_ORIGIN: 'https://login.acme',
+    ALLOWED_ORIGINS: 'https://login.acme',
+    APP_DOMAIN: 'login.acme',
+    ACTION_ID: 'claim-v1',
+    GATEWAY_ISSUER: 'gateway-prod',
+    GATEWAY_KEY_ID: 'key-prod-1',
+    ATTESTATION_AUDIENCE: 'login.acme',
+    CIRCUIT_ID: 'telegram-auth',
+    CIRCUIT_VERSION: '2',
+    ARTIFACT_SET_ID: 'artifact-prod-1',
+    TELEGRAM_BOT_TOKEN: '123:real-token',
+    NULLIFIER_SECRET: Buffer.alloc(32, 1).toString('base64'),
+    GATEWAY_PRIVATE_KEY_BASE64: Buffer.from('fixture-private-key').toString('base64'),
+  };
+  assert.throws(() => loadConfig({ ...base, METRICS_ENABLED: 'true' }), /METRICS_TOKEN/);
+  const token = Buffer.alloc(32, 8).toString('base64');
+  assert.equal(loadConfig({ ...base, METRICS_ENABLED: 'true', METRICS_TOKEN: token }).metricsToken.length, 32);
+});

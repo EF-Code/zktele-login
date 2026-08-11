@@ -54,4 +54,13 @@ test('rejects tampered, expired, future, duplicate and malformed Telegram data',
     now: NOW,
     maxAgeSec: 300,
   }), /user payload/);
+
+  for (const value of ['null', '[]', '"42"']) {
+    const malformedShape = validInitData({ user: value });
+    assert.throws(() => validateTelegramInitData(malformedShape, {
+      botToken: BOT_TOKEN,
+      now: NOW,
+      maxAgeSec: 300,
+    }), /user payload|user id/);
+  }
 });

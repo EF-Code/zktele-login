@@ -9,6 +9,7 @@
     "dev": "NODE_ENV=development ALLOW_DEV_INIT=true node server.mjs",
     "test": "NODE_ENV=test node --test --test-concurrency=1",
     "test:postgres": "NODE_ENV=test node --test --test-concurrency=1 test/postgres.integration.test.mjs",
+    "test:load": "node scripts/load-smoke.mjs",
     "check": "node --check server.mjs && node --check lib/*.mjs && node --check public/app.js && node --check scripts/*.mjs",
     "migrate": "node scripts/migrate.mjs"
   },

@@ -34,6 +34,7 @@ jobs:
       - run: npm ci --no-audit --no-fund
       - run: npm run check
       - run: npm test
+      - run: npm run test:load
       - run: npm run test:postgres
         env:
           DATABASE_URL: postgresql://zktele:test-only@127.0.0.1:5432/zktele
@@ -48,6 +49,7 @@ jobs:
       - name: Container smoke test
         run: |
           docker run --detach --name zktele-login-ci \
+            --read-only --tmpfs /tmp:rw,noexec,nosuid,size=16m \
             --env NODE_ENV=development \
             --env SERVICE_ROLE=combined \
             --env ENVIRONMENT_ID=ci \
@@ -56,6 +58,10 @@ jobs:
             --env ALLOW_DEV_INIT=true \
             --publish 18080:3000 zktele-login:ci
           trap 'docker rm -f zktele-login-ci' EXIT
-          for i in $(seq 1 30); do curl --fail --silent http://127.0.0.1:18080/health/live && exit 0; sleep 1; done
+          for i in $(seq 1 30); do
+            if curl --fail --silent http://127.0.0.1:18080/health/live \
+              && curl --fail --silent http://127.0.0.1:18080/health/ready; then exit 0; fi
+            sleep 1
+          done
           docker logs zktele-login-ci
           exit 1

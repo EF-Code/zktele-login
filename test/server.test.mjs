@@ -59,6 +59,34 @@ test('HTTP boundary gates development signing and atomically rejects duplicate c
   });
 });
 
+test('completion rejects unavailable challenges before invoking the verifier', async () => {
+  const config = loadConfig({ NODE_ENV: 'test', ALLOW_DEV_INIT: 'true' });
+  let verifierCalls = 0;
+  const app = await createApplication({
+    config,
+    authService: {
+      publicKey: 'PUBLIC KEY',
+      publicKeyFingerprint: 'fingerprint',
+      verify: async () => { verifierCalls += 1; return { isValid: true }; },
+      authenticate: async () => ({ signed: true }),
+    },
+    claimStore: new MemoryClaimStore(),
+  });
+  await new Promise((resolve) => app.server.listen(0, '127.0.0.1', resolve));
+  const baseUrl = `http://127.0.0.1:${app.server.address().port}`;
+  try {
+    const response = await fetch(`${baseUrl}/api/auth/complete`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', origin: 'http://localhost:3000' },
+      body: JSON.stringify({ operation: 'login', attestation: { challenge: 'not-issued' } }),
+    });
+    assert.equal(response.status, 409);
+    assert.equal(verifierCalls, 0);
+  } finally {
+    await app.close();
+  }
+});
+
 test('HTTP boundary enforces content type, body size and security headers', async () => {
   await withServer(async (baseUrl) => {
     const wrongType = await fetch(`${baseUrl}/api/verify`, { method: 'POST', body: '{}' });
@@ -121,6 +149,7 @@ test('gateway and relying roles expose only their intended HTTP boundaries', asy
   const gatewayUrl = `http://127.0.0.1:${gateway.server.address().port}`;
   try {
     assert.equal((await fetch(`${gatewayUrl}/api/config`)).status, 404);
+    assert.equal((await fetch(`${gatewayUrl}/api/authenticate`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' })).status, 404);
     const attest = await fetch(`${gatewayUrl}/v1/attest`, {
       method: 'POST',
       headers: { 'content-type': 'application/json', origin: 'http://localhost:3000' },
@@ -175,6 +204,55 @@ test('unexpected dependency failures are generic 500 responses', async () => {
     assert.equal(response.status, 500);
     assert.equal(payload.error, 'internal server error');
     assert.equal(JSON.stringify(payload).includes('database password'), false);
+  } finally {
+    await app.close();
+  }
+});
+
+test('metrics endpoint is opt-in and contains only coarse service measurements', async () => {
+  const config = loadConfig({
+    NODE_ENV: 'test', ALLOW_DEV_INIT: 'true', METRICS_ENABLED: 'true', RATE_LIMIT_PER_MINUTE: '100',
+  });
+  const app = await createApplication({
+    config,
+    authService: {
+      publicKey: 'PUBLIC KEY',
+      publicKeyFingerprint: 'fingerprint',
+      authenticate: async () => ({ signed: true }),
+      verify: async () => ({ isValid: false }),
+    },
+    claimStore: new MemoryClaimStore(),
+  });
+  await new Promise((resolve) => app.server.listen(0, '127.0.0.1', resolve));
+  const baseUrl = `http://127.0.0.1:${app.server.address().port}`;
+  try {
+    const challenge = await fetch(`${baseUrl}/api/challenge`);
+    assert.equal(challenge.status, 200);
+    const challengePayload = await challenge.json();
+    const response = await fetch(`${baseUrl}/health/metrics`);
+    assert.equal(response.status, 200);
+    const text = await response.text();
+    assert.match(text, /http_responses_2xx_total/);
+    assert.match(text, /challenges_created_total 1/);
+    assert.equal(text.includes(challengePayload.challenge), false, 'metrics must not contain challenge values');
+  } finally {
+    await app.close();
+  }
+});
+
+test('metrics endpoint requires the configured bearer token', async () => {
+  const token = Buffer.alloc(32, 6).toString('base64');
+  const config = loadConfig({ NODE_ENV: 'test', ALLOW_DEV_INIT: 'true', METRICS_ENABLED: 'true', METRICS_TOKEN: token });
+  const app = await createApplication({
+    config,
+    authService: { publicKey: 'PUBLIC KEY', publicKeyFingerprint: 'fingerprint', authenticate: async () => ({ signed: true }), verify: async () => ({ isValid: false }) },
+    claimStore: new MemoryClaimStore(),
+  });
+  await new Promise((resolve) => app.server.listen(0, '127.0.0.1', resolve));
+  const baseUrl = `http://127.0.0.1:${app.server.address().port}`;
+  try {
+    assert.equal((await fetch(`${baseUrl}/health/metrics`)).status, 404);
+    assert.equal((await fetch(`${baseUrl}/health/metrics`, { headers: { authorization: `Bearer ${token}` } })).status, 200);
   } finally {
     await app.close();
   }

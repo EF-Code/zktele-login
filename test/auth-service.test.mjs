@@ -80,5 +80,18 @@ test('requires a signed gateway envelope and fixed domain/freshness policy', asy
     proofPayload: { ...first.proofPayload, publicSignals: ['1234', '1', '9999', String(NOW), '999', '0', issuerKeyHash] },
   }, keys.privateKey);
   assert.match((await service.verify(wrongPolicy)).error, /freshness policy/);
+
+  const inconsistentVerifier = createAuthService(config(), {
+    keys,
+    clock: () => NOW,
+    generateProof: async () => first.proofPayload,
+    verifyProof: async (_payload, policy) => ({
+      isValid: true,
+      nullifierHash: 'wrong',
+      appDomainHash: '9999',
+      issuerKeyHash: policy.expectedIssuerKeyHash,
+    }),
+  });
+  assert.match((await inconsistentVerifier.verify(first)).error, /inconsistent public signals/);
   assert.equal(second.actionId, 'claim-v1');
 });
