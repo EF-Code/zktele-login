@@ -1,74 +1,125 @@
 # zktele-login
 
-Demo web app for **anonymous, Sybil-resistant Telegram login** powered by the [zk-tele-auth](https://github.com/EF-Code/zk-tele-auth) stack.
+`zktele-login` is a reference implementation of gateway-attested Telegram
+Mini App authentication. A trusted gateway validates Telegram's server-signed
+`initData`, generates an issuer-bound Groth16 proof, and signs the complete
+proof envelope with Ed25519. A separate relying service pins the gateway key
+and issuer commitment, verifies the proof policy, consumes a one-time
+challenge, and records a scoped claim or server-side session.
 
-"Log in with Telegram, but nobody sees your ID": the gateway validates your
-Telegram MiniApp `initData`, then emits a Groth16 proof over **BLS12-381**. The
-only thing a dApp ever learns is a **nullifier** — a deterministic hash of
-`userId + app domain`. No `userId`, name, or photo ever leaves the gateway.
+A valid Groth16 proof by itself is not Telegram authentication. The circuit
+does not verify Telegram's HMAC; the relying service therefore requires both
+the issuer-bound commitment and the pinned gateway signature.
 
-## Run
+## Trust boundary
+
+The `gateway` role may read `TELEGRAM_BOT_TOKEN`, `NULLIFIER_SECRET`, and the
+Ed25519 private key. It must not receive relying-service session or database
+credentials. The `relying` role receives only the gateway public-key map, its
+own session secret, and restricted PostgreSQL credentials. The browser receives
+no secret and never uses `initDataUnsafe` for authentication.
+
+For local UI work, `SERVICE_ROLE=combined` and `ALLOW_DEV_INIT=true` enable a
+clearly non-production simulation route. Production rejects the combined role
+unless an explicit exception is configured, and never exposes
+`/api/dev/init`.
+
+## Local development
 
 ```sh
-npm install
-npm start
-# → http://localhost:3000
+npm ci
+npm run dev
+# http://localhost:3000
 ```
 
-Options:
+The local development process creates ephemeral keys and permits simulated
+identities. For a database-backed local run, start PostgreSQL with
+`docker compose up -d postgres`, set `DATABASE_URL`, run `npm run migrate`, and
+then start the app. The migration user should be separate from the runtime
+user outside local development.
 
-| env var | default | meaning |
-|---|---|---|
-| `PORT` | `3000` | HTTP port |
-| `APP_DOMAIN` | `zktele-login.demo` | domain bound into the nullifier |
-| `TELEGRAM_BOT_TOKEN` | dev placeholder | used to sign/verify initData |
+## Production roles
 
-## What it demonstrates
+Set `SERVICE_ROLE=gateway` for the Telegram proof service and
+`SERVICE_ROLE=relying` for the browser/API service. The exact HTTPS origins,
+audience, action, issuer, key ID, circuit version, and artifact set are
+deployment identities—not defaults. The relying service requires
+`ISSUER_KEY_HASH` and a pinned `GATEWAY_PUBLIC_KEY_FILE`,
+`GATEWAY_PUBLIC_KEY_BASE64`, or `GATEWAY_PUBLIC_KEYS_JSON`.
 
-- **Anonymity** — the `/api/authenticate` response (shown on the page) contains
-  no `userId`; only a proof and a nullifier. The `userId` never leaves the
-  gateway.
-- **Unlinkability** — a random salt is mixed into the nullifier, so every login
-  mints a *fresh* nullifier. Log in twice as the same user and you get two
-  different nullifiers — sessions cannot be correlated even by a server holding
-  the full history.
-- **Sybil-resistance** — a proof can only be minted for a real bot-signed
-  Telegram session (the HMAC check happens inside the gateway), so identities
-  cannot be forged for free. Note: because nullifiers are fresh per login,
-  enforcing strict "one account = one vote" dedup requires the deterministic
-  nullifier variant of the stack (omit the salt); this demo shows the
-  unlinkable-session mode.
-- **Freshness & tamper-resistance** — proofs carry a timestamp and are
-  pairing-checked; the "replay" button shows a tampered proof being rejected.
-- **Domain binding** — the app domain is hashed into the circuit, so a proof
-  minted for this demo can't be replayed on another app (try the cross-domain
-  button).
-- **Session claims** — a nullifier registry lets the app hand out "one thing
-  per account": a claim succeeds once, and replaying the same proof is
-  rejected.
-- **Allowlist membership** — prove you're on a private list without revealing
-  who you are. The app commits to a Merkle `root` only; `leaf = Poseidon(userId,
-  1)` hides the account even from the leaf, and outsiders get `isMember=0`.
+The full variable list is in [.env.example](/home/wellington/stuff/zktele-login/.env.example). In production, also provide:
 
-## API
+- a managed secret mount for the gateway private key and nullifier secret;
+- a restricted PostgreSQL runtime credential and a separate migration
+  credential;
+- `DATABASE_SSL=true` plus a verified CA bundle when required by the provider;
+- a session secret on the relying service;
+- exact `ALLOWED_ORIGINS` and `GATEWAY_ORIGIN` values.
 
-| route | request | response |
-|---|---|---|
-| `POST /api/init` | `{ userId, isPremium }` | `{ initData }` signed like Telegram would |
-| `POST /api/authenticate` | `{ initData }` | `{ nullifierHash, proofPayload }` |
-| `POST /api/verify` | `{ proofPayload, appDomain? }` | `{ isValid, nullifierHash, error? }` |
-| `POST /api/claim` | `{ proofPayload }` | `{ claimed, claims }` — 409 on replay |
-| `GET /api/claims` | — | `{ claims }` |
-| `GET /api/config` | — | `{ appDomain }` |
-| `GET /api/membership` | — | `{ root, memberCount, members }` |
-| `POST /api/membership/prove` | `{ memberId }` | `{ proofPayload, leaf, isMember }` |
-| `POST /api/membership/verify` | `{ proofPayload }` | `{ isValid, isMember, leaf, root, error? }` |
+Run migrations before starting the runtime user:
 
-## Security notes
+```sh
+DATABASE_URL='postgresql://migration-user@db/zktele' npm run migrate
+NODE_ENV=production SERVICE_ROLE=relying npm start
+```
 
-- `POST /api/init` **simulates Telegram's signing** so the flow can be tested
-  with no real bot. In production, initData is signed by Telegram inside the
-  MiniApp; do not expose a signing endpoint.
-- The bot token is a **server secret** — set `TELEGRAM_BOT_TOKEN` in production.
-- For a production deployment, re-run the setup ceremony with a public
-  powers-of-tau (the committed artifacts use a fixed dev beacon).
+The runtime does not create schema objects at startup. PostgreSQL uniqueness
+is enforced on `(issuer, app_domain, action_id, nullifier_hash)`, and challenge
+consumption plus claim insertion use a transaction when the PostgreSQL store is
+active.
+
+## API surface
+
+Relying service:
+
+| Route | Purpose |
+| --- | --- |
+| `GET /health/live` | Process liveness |
+| `GET /health/ready` | Readiness boundary |
+| `GET /api/config` | Public descriptive policy metadata |
+| `GET /api/challenge` | Creates a verifier-owned one-time challenge |
+| `POST /api/auth/complete` | Verifies an attestation and issues a session or claim result |
+| `POST /api/claim` | Compatibility claim completion route |
+| `GET /api/session` / `POST /api/logout` | Opaque server-side session lifecycle |
+
+Gateway service:
+
+| Route | Purpose |
+| --- | --- |
+| `GET /health/live` | Process liveness |
+| `GET /health/ready` | Readiness boundary |
+| `POST /v1/attest` | Validates Telegram data and returns a signed attestation |
+
+`/v1/attest` accepts `initData`, `challenge`, `audience`, `appDomain`, and
+`actionId`. The gateway allowlists all authorization context values against its
+configuration. The relying side treats the public key in `/api/config` as
+diagnostic metadata, never as a trust root.
+
+## Validation and supply chain
+
+```sh
+npm ci
+npm run check
+npm test
+npm audit --omit=dev
+docker build --tag zktele-login:local .
+```
+
+The dependency is pinned to the issuer-bound upstream revision
+`e50efa26ce54c940b138885a9aac40ee7ed00206` over credential-free HTTPS. Root
+overrides select `bfj@9.1.3` and `underscore>=1.13.8`; the current audit is
+clean. `test/artifact-provenance.test.mjs` verifies the exact Telegram-auth
+WASM, R1CS, proving-key, and verification-key hashes copied from that pinned
+revision. Review the trusted setup and circuit independently before any
+production claim.
+
+The container runs as the unprivileged `node` user. CI uses `npm ci`, the
+issuer-bound proof integration suite, dependency audit, secret scanning, a
+container build, and a health smoke test. Provider-neutral deployment and
+rollback procedures are in [DEPLOYMENT.md](/home/wellington/stuff/zktele-login/DEPLOYMENT.md)
+and [SECURITY.md](/home/wellington/stuff/zktele-login/SECURITY.md).
+
+Passing local tests is not a production declaration. Real PostgreSQL,
+multi-instance, load, Telegram-client, deployment-edge, backup/restore,
+trusted-setup, and independent security-review gates remain external until
+performed and evidenced.

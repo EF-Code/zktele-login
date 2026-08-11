@@ -1,0 +1,13 @@
+.git
+.github
+.env
+.env.*
+*.pem
+*.key
+node_modules
+npm-debug.log*
+coverage
+reports
+test
+LUNA_MAX_DEPLOYMENT_HANDOFF.md
+README.private.md

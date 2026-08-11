@@ -1,0 +1,61 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    services:
+      postgres:
+        image: postgres:17.5
+        env:
+          POSTGRES_DB: zktele
+          POSTGRES_USER: zktele
+          POSTGRES_PASSWORD: test-only
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U zktele -d zktele"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      - run: npm run check
+      - run: npm test
+      - run: npm run test:postgres
+        env:
+          DATABASE_URL: postgresql://zktele:test-only@127.0.0.1:5432/zktele
+      - run: npm audit --omit=dev
+      - name: Dependency inventory
+        run: npm ls --all --omit=dev
+      - name: Secret regression scan
+        run: |
+          ! git grep -nE '(ghp_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,}|BEGIN (RSA |EC |OPENSSH )?PRIVATE KEY|TELEGRAM_BOT_TOKEN=[^[:space:]]+)' -- . ':!LUNA_MAX_DEPLOYMENT_HANDOFF.md' ':!.github/workflows/ci.yml'
+      - name: Build container
+        run: docker build --pull --tag zktele-login:ci .
+      - name: Container smoke test
+        run: |
+          docker run --detach --name zktele-login-ci \
+            --env NODE_ENV=development \
+            --env SERVICE_ROLE=combined \
+            --env ENVIRONMENT_ID=ci \
+            --env APP_ORIGIN=http://localhost:3000 \
+            --env ALLOWED_ORIGINS=http://localhost:3000 \
+            --env ALLOW_DEV_INIT=true \
+            --publish 18080:3000 zktele-login:ci
+          trap 'docker rm -f zktele-login-ci' EXIT
+          for i in $(seq 1 30); do curl --fail --silent http://127.0.0.1:18080/health/live && exit 0; sleep 1; done
+          docker logs zktele-login-ci
+          exit 1

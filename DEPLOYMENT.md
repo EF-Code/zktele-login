@@ -1,0 +1,59 @@
+# Provider-neutral deployment runbook
+
+This document describes the release sequence without choosing a cloud
+provider. Do not expose the gateway and relying roles through one process in a
+production deployment.
+
+## Build and migration
+
+1. Build from the reviewed commit with a clean checkout and `npm ci`.
+2. Verify `npm run check`, `npm test`, `npm audit --omit=dev`, and the artifact
+   hashes in `test/artifact-provenance.test.mjs`.
+3. Build the multi-stage `Dockerfile` and scan the image. It must contain no
+   `.env` files, keys, Git metadata, tests, or deployment handoff notes.
+4. Run `npm run migrate` once with the separate migration credential. The
+   runtime role must have DML access only to the application tables and must
+   not be a schema owner.
+5. Perform a restore drill against a disposable database and retain the
+   timestamped evidence.
+
+## Gateway
+
+Set `SERVICE_ROLE=gateway`, an explicit production `ENVIRONMENT_ID`, HTTPS
+`APP_ORIGIN`, exact `ALLOWED_ORIGINS`, and the configured issuer/action/circuit
+identities. Inject only the Telegram bot token, issuer/nullifier secret, and
+Ed25519 private key. Mount the private key read-only (`0400`) and record its
+fingerprint out of band. The gateway exposes `/v1/attest` and health routes;
+it does not serve the browser or a database.
+
+## Relying service
+
+Set `SERVICE_ROLE=relying` and inject only the pinned gateway public key map,
+`ISSUER_KEY_HASH`, session secret, restricted PostgreSQL URL, database TLS CA,
+and exact browser/gateway origins. It must not contain `TELEGRAM_BOT_TOKEN`,
+`NULLIFIER_SECRET`, or `GATEWAY_PRIVATE_KEY_*`. Serve the browser, challenges,
+completion, sessions, and claims from this role.
+
+Terminate TLS at a controlled edge, configure the edge body/request limits and
+distributed rate limiter, and document the exact proxy trust behavior before
+enabling any forwarded-address logic. Preserve the application CSP and do not
+use wildcard CORS with credentials.
+
+## Staging and rollback
+
+1. Deploy both roles to an isolated staging origin and run database migrations.
+2. Pin the gateway public key and issuer commitment in the relying deployment.
+3. Exercise challenge issuance, valid completion, replay, cross-origin,
+   malformed-proof, logout, restart, and concurrent claim paths.
+4. Verify that relying logs and database rows contain no raw Telegram ID,
+   `initData`, profile JSON, proof witness, issuer secret, private key, or
+   session token.
+5. Test the supported Telegram Android, iOS, Desktop, and Web clients.
+6. Promote gradually with liveness/readiness checks, latency/CPU/memory
+   budgets, and an alert-backed rollback window.
+
+Rollback means stopping new traffic, restoring the last reviewed container,
+running only backward-compatible migrations, and retaining the active public
+key until every old attestation expires. Revoke a compromised Ed25519 key by
+removing its key ID from the relying allowlist and redeploying. Issuer/nullifier
+secret rotation is a separate migration because it changes nullifier continuity.
