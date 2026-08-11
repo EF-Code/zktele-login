@@ -51,6 +51,11 @@ recorded.
   The local HTTP flow passed challenge issuance, token-backed gateway
   attestation, relying verification, login completion, and session lookup;
   the production simulation route returned 404 on the gateway.
+- Headless Chrome against the running localhost split backend passed the real
+  page flow with an injected token-backed Telegram WebApp fixture: the page
+  obtained an attestation, displayed the verified state, enabled the claim
+  action, and received a successful claim response. No browser secrets or
+  request values were recorded.
 - Logical backup/restore passed with matching PostgreSQL 16 client/server
   tools. Restored challenge race, claim, session, and row-count invariants
   passed. The latest disposable dump was 11,970 bytes with recorded SHA-256
@@ -66,8 +71,10 @@ recorded.
 - InfinityFree cannot host the Node/Docker/PostgreSQL backend. It can only be
   considered for domain/DNS/static-edge use; a compatible backend provider is
   still required.
-- No Telegram bot token has been supplied. Real BotFather/Mini App setup and
-  Android, iOS, Desktop, and Web client tests are therefore pending.
+- The supplied staging bot token passes local `getMe`, HMAC, and gateway
+  attestation checks. Real BotFather/Mini App configuration and Android, iOS,
+  Desktop, and Web client tests remain pending until a public HTTPS origin is
+  configured.
 - DNS ownership, certificate issuance, proxy trust, exact production origins,
   secret-manager injection, distributed rate limiting, and deployed HTTP
   header/cookie/CORS checks remain external gates.
