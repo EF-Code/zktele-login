@@ -6,6 +6,9 @@ import { fileURLToPath } from 'url';
 const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const databaseUrl = process.env.DATABASE_URL;
 if (!databaseUrl) throw new Error('DATABASE_URL is required for migrations');
+if (process.env.NODE_ENV === 'production' && process.env.DATABASE_SSL !== 'true') {
+  throw new Error('DATABASE_SSL=true is required for production migrations');
+}
 
 const files = (await fs.readdir(path.join(root, 'db', 'migrations')))
   .filter((name) => /^\d+_[a-z0-9_-]+\.sql$/.test(name))

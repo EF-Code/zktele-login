@@ -4,11 +4,13 @@
 \set ON_ERROR_STOP on
 \if :{?runtime_user}
 \else
-  \error 'runtime_user is required (use psql -v runtime_user=...)'
+  \echo 'runtime_user is required (use psql -v runtime_user=...)' >&2
+  SELECT CAST('runtime_user is required' AS integer);
 \endif
 \if :{?app_database}
 \else
-  \error 'app_database is required (use psql -v app_database=...)'
+  \echo 'app_database is required (use psql -v app_database=...)' >&2
+  SELECT CAST('app_database is required' AS integer);
 \endif
 
 GRANT CONNECT ON DATABASE :"app_database" TO :"runtime_user";

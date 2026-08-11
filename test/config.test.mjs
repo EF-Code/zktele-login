@@ -50,6 +50,31 @@ test('development simulation is impossible in production', () => {
   }), /development bot token is forbidden/);
 });
 
+test('production relying services require PostgreSQL TLS', () => {
+  const base = {
+    NODE_ENV: 'production',
+    SERVICE_ROLE: 'relying',
+    ENVIRONMENT_ID: 'production',
+    APP_ORIGIN: 'https://login.acme',
+    ALLOWED_ORIGINS: 'https://login.acme',
+    GATEWAY_ORIGIN: 'https://gateway.acme',
+    APP_DOMAIN: 'login.acme',
+    ACTION_ID: 'claim-v1',
+    GATEWAY_ISSUER: 'gateway-prod',
+    GATEWAY_KEY_ID: 'key-prod-1',
+    ATTESTATION_AUDIENCE: 'login.acme',
+    CIRCUIT_ID: 'telegram-auth',
+    CIRCUIT_VERSION: '2',
+    ARTIFACT_SET_ID: 'artifact-prod-1',
+    DATABASE_URL: 'postgresql://runtime@database/login',
+    GATEWAY_PUBLIC_KEY_BASE64: Buffer.from('-----BEGIN PUBLIC KEY-----\nfixture\n-----END PUBLIC KEY-----\n', 'utf8').toString('base64'),
+    ISSUER_KEY_HASH: '12345',
+    SESSION_SECRET: Buffer.alloc(32, 4).toString('base64'),
+  };
+  assert.throws(() => loadConfig(base), /DATABASE_SSL=true/);
+  assert.equal(loadConfig({ ...base, DATABASE_SSL: 'true' }).databaseSsl, true);
+});
+
 test('development configuration exposes simulation only when explicitly enabled', () => {
   const config = loadConfig({ NODE_ENV: 'development', ALLOW_DEV_INIT: 'true' });
   assert.equal(config.allowDevInit, true);
