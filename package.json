@@ -11,6 +11,7 @@
     "test:postgres": "NODE_ENV=test node --test --test-concurrency=1 --test-force-exit test/postgres.integration.test.mjs",
     "test:load": "node scripts/load-smoke.mjs",
     "test:proof-load": "node scripts/proof-load.mjs",
+    "local:backend": "node scripts/local-backend.mjs",
     "check": "node --check server.mjs && node --check lib/*.mjs && node --check public/app.js && node --check scripts/*.mjs",
     "migrate": "node scripts/migrate.mjs"
   },

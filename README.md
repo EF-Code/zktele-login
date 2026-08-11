@@ -38,6 +38,29 @@ identities. For a database-backed local run, start PostgreSQL with
 then start the app. The migration user should be separate from the runtime
 user outside local development.
 
+### Local split backend with a real staging bot token
+
+For a local, production-shaped split without a public domain, keep a dedicated
+staging bot token in `.env.staging` (either as `TELEGRAM_BOT_TOKEN=...` or as a
+single raw token line), set the file mode to `600`, and ensure it is ignored by
+Git. Start the disposable PostgreSQL container and apply migrations with the
+migration credential, then run:
+
+```sh
+chmod 600 .env.staging
+NODE_ENV=development DATABASE_URL='postgresql://zktele_migrate:local-development-only@127.0.0.1:55432/zktele' \
+  DATABASE_SSL=false npm run migrate
+npm run local:backend
+```
+
+`local:backend` starts separate gateway and relying processes on
+`http://localhost:4001` and `http://localhost:4000`. It generates ephemeral
+Ed25519/session/nullifier material in memory, gives the bot token only to the
+gateway, pins the gateway public key in the relying process, and uses the
+restricted local PostgreSQL runtime role. The local launcher is HTTP-only and
+uses test identities; it is for backend integration and browser development,
+not production deployment. Stop it with Ctrl-C.
+
 ## Production roles
 
 Set `SERVICE_ROLE=gateway` for the Telegram proof service and

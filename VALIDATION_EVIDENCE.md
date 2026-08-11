@@ -46,6 +46,11 @@ recorded.
   file with mode `600`; Telegram `getMe` succeeded, and the gateway accepted a
   fixture HMAC made with that token before generating a real Groth16
   attestation. No bot identity or token value is recorded here.
+- `npm run local:backend` started separate localhost gateway and relying
+  processes with secret separation and the restricted PostgreSQL runtime role.
+  The local HTTP flow passed challenge issuance, token-backed gateway
+  attestation, relying verification, login completion, and session lookup;
+  the production simulation route returned 404 on the gateway.
 - Logical backup/restore passed with matching PostgreSQL 16 client/server
   tools. Restored challenge race, claim, session, and row-count invariants
   passed. The latest disposable dump was 11,970 bytes with recorded SHA-256
