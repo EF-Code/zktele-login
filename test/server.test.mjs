@@ -151,3 +151,31 @@ test('gateway and relying roles expose only their intended HTTP boundaries', asy
     await relying.close();
   }
 });
+
+test('unexpected dependency failures are generic 500 responses', async () => {
+  const config = loadConfig({ NODE_ENV: 'test', ALLOW_DEV_INIT: 'true', ALLOWED_ORIGINS: 'http://localhost:3000' });
+  const app = await createApplication({
+    config,
+    authService: {
+      publicKey: 'PUBLIC KEY',
+      publicKeyFingerprint: 'fingerprint',
+      verify: async () => { throw new Error('database password leaked'); },
+    },
+    claimStore: new MemoryClaimStore(),
+  });
+  await new Promise((resolve) => app.server.listen(0, '127.0.0.1', resolve));
+  const baseUrl = `http://127.0.0.1:${app.server.address().port}`;
+  try {
+    const response = await fetch(`${baseUrl}/api/verify`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ attestation: {} }),
+    });
+    const payload = await response.json();
+    assert.equal(response.status, 500);
+    assert.equal(payload.error, 'internal server error');
+    assert.equal(JSON.stringify(payload).includes('database password'), false);
+  } finally {
+    await app.close();
+  }
+});
