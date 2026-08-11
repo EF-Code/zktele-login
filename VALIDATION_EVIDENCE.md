@@ -61,6 +61,14 @@ recorded.
   obtained an attestation, displayed the verified state, enabled the claim
   action, and received a successful claim response. No browser secrets or
   request values were recorded.
+- The local UI flow was repeated with Playwright using desktop-Chrome,
+  Android-Chrome, iOS-Safari, and Telegram-Desktop-like user-agent emulations:
+  4/4 authentication passes and 4/4 claim passes. These are browser
+  emulations with injected fixtures, not real Telegram clients.
+- Local adversarial HTTP checks passed: public config exposed no gateway
+  secrets, a tampered signature and cross-domain attestation were rejected,
+  login and claim replays returned `409`, untrusted origins returned `403`,
+  and the gateway development route returned `404`.
 - A disposable production-mode rehearsal passed behind a local self-signed
   HTTPS edge and TLS-enabled PostgreSQL 16 with CA verification. Exact HTTPS
   origin/CORS policy, HSTS and security headers, real token-backed gateway
