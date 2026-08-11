@@ -61,6 +61,12 @@ recorded.
   obtained an attestation, displayed the verified state, enabled the claim
   action, and received a successful claim response. No browser secrets or
   request values were recorded.
+- A disposable production-mode rehearsal passed behind a local self-signed
+  HTTPS edge and TLS-enabled PostgreSQL 16 with CA verification. Exact HTTPS
+  origin/CORS policy, HSTS and security headers, real token-backed gateway
+  attestation, `__Host-` Secure session cookies, session lookup, claim, and
+  gateway development-route isolation all passed. The fixture used synthetic
+  HMAC-valid Telegram data; it is not a real Telegram WebView test.
 - Logical backup/restore passed with matching PostgreSQL 16 client/server
   tools. Restored challenge race, claim, session, and row-count invariants
   passed. The latest disposable dump was 11,970 bytes with recorded SHA-256
