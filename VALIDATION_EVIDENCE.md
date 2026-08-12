@@ -80,6 +80,15 @@ recorded.
   passed. The latest disposable dump was 11,970 bytes with recorded SHA-256
   `b0e87479c56005539e178c562c2270ada12d58989b4e16a4be2ad9fa4bca48ac` and the
   restored table counts were `0|2|1` (challenges|claims|sessions).
+- The simplified local workflow passed its static/config checks: `npm run
+  setup:local` created a mode-600 ignored `.env.local` from the existing
+  mode-600 staging token file, `docker compose --env-file .env.local --file
+  compose.local.yaml config --quiet` passed, and `npm run production:check`
+  accepted a representative production gateway configuration without
+  printing secret values.
+- Chrome through `npm run demo` completed the local fixture authentication and
+  claim flow. This exercises the fast one-process demo mode, not Telegram
+  authenticity.
 
 ## Not a local green gate
 
@@ -99,6 +108,12 @@ recorded.
   header/cookie/CORS checks remain external gates.
 - A true rollback to a prior immutable release image and provider-native PITR
   drill require a staging provider and a retained previous release.
+- The simplified local Compose build was not completed in this run. The host
+  Docker daemon accepted the build but spent more than 25 minutes in the
+  Debian `apt`/`npm ci` layers across repeated attempts, so the exact build
+  processes were stopped without removing Docker data. The Compose file itself
+  parsed successfully; rerun `npm run telegram:local` on a warm, healthy Docker
+  cache before treating the container gate as passed.
 - The user explicitly waived independent cryptographic review for this solo
   project. That waiver is recorded as risk acceptance; it is not evidence of
   cryptographic or trusted-setup independence.
