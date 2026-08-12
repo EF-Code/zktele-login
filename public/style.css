@@ -749,27 +749,109 @@ h2 {
   margin-top: 1rem;
 }
 
-.dim {
+.text-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
+  padding: 0.62rem 0.78rem;
+  border-color: var(--border);
+  background: transparent;
+  color: var(--dim-strong);
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.text-button:hover:not(:disabled) {
+  border-color: var(--border-strong);
+  background: rgba(145, 170, 199, 0.09);
+  color: var(--text);
+}
+
+.claim-card {
+  display: flex;
+  flex-direction: column;
+}
+
+.claim-card h2 {
+  margin-top: 0.5rem;
+}
+
+.claim-actions {
+  margin-top: auto;
+  padding-top: 1.3rem;
+}
+
+.claim-actions .primary-button {
+  margin-top: 0;
+}
+
+.claim-actions .text-button {
+  width: 100%;
+  margin-top: 0.55rem;
+}
+
+.claim-card .status {
+  margin-top: 1rem;
+}
+
+.ledger-card {
+  margin-bottom: 1rem;
+  padding: clamp(1.2rem, 3vw, 1.65rem);
+}
+
+.ledger-heading {
+  align-items: flex-end;
+  margin-bottom: 1rem;
+}
+
+.ledger-count {
   color: var(--dim);
+}
+
+.ledger-count span {
+  color: var(--cyan);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.8rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.table-wrap {
+  overflow-x: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
 }
 
 table {
   width: 100%;
+  min-width: 590px;
   border-collapse: collapse;
-  font-size: 0.85rem;
+  font-size: 0.73rem;
 }
 
 th,
 td {
-  text-align: left;
-  padding: 0.45rem 0.5rem;
+  padding: 0.75rem 0.85rem;
   border-bottom: 1px solid var(--border);
+  text-align: left;
   vertical-align: top;
 }
 
 th {
+  background: rgba(145, 170, 199, 0.045);
   color: var(--dim);
-  font-weight: 600;
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+}
+
+tbody tr:last-child td {
+  border-bottom: none;
+}
+
+tbody tr:not(.empty-row):hover {
+  background: rgba(145, 170, 199, 0.045);
 }
 
 td.ok {
