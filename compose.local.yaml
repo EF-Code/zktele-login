@@ -1,0 +1,56 @@
+name: zktele-login-local
+
+services:
+  postgres:
+    image: postgres:17.5-alpine
+    environment:
+      POSTGRES_DB: zktele
+      POSTGRES_USER: zktele_local
+      POSTGRES_PASSWORD: local-development-only
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U zktele_local -d zktele"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    ports:
+      - "55432:5432"
+    volumes:
+      - zktele-local-postgres:/var/lib/postgresql/data
+
+  migrate:
+    image: zktele-login:local
+    build: .
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      NODE_ENV: development
+      DATABASE_URL: postgresql://zktele_local:local-development-only@postgres:5432/zktele
+      DATABASE_SSL: "false"
+    command: ["npm", "run", "migrate"]
+
+  app:
+    image: zktele-login:local
+    build: .
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    env_file:
+      - .env.local
+    environment:
+      NODE_ENV: development
+      SERVICE_ROLE: combined
+      ALLOW_DEV_INIT: "false"
+      DATABASE_URL: postgresql://zktele_local:local-development-only@postgres:5432/zktele
+      DATABASE_SSL: "false"
+      PORT: "3000"
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/health/ready').then((r) => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"]
+      interval: 10s
+      timeout: 3s
+      retries: 12
+    ports:
+      - "3000:3000"
+
+volumes:
+  zktele-local-postgres:

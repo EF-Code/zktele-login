@@ -7,6 +7,13 @@
   "scripts": {
     "start": "NODE_ENV=production node server.mjs",
     "dev": "NODE_ENV=development ALLOW_DEV_INIT=true node server.mjs",
+    "demo": "NODE_ENV=development SERVICE_ROLE=combined ALLOW_DEV_INIT=true node server.mjs",
+    "setup:local": "node scripts/setup-local.mjs",
+    "telegram:local": "node scripts/local-staging.mjs up",
+    "telegram:down": "node scripts/local-staging.mjs down",
+    "telegram:logs": "node scripts/local-staging.mjs logs",
+    "telegram:reset": "node scripts/local-staging.mjs reset",
+    "production:check": "NODE_ENV=production node scripts/production-check.mjs",
     "test": "NODE_ENV=test node --test --test-concurrency=1 --test-force-exit",
     "test:postgres": "NODE_ENV=test node --test --test-concurrency=1 --test-force-exit test/postgres.integration.test.mjs",
     "test:load": "node scripts/load-smoke.mjs",

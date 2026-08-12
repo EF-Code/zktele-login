@@ -28,15 +28,49 @@ unless an explicit exception is configured, and never exposes
 
 ```sh
 npm ci
-npm run dev
+npm run demo
 # http://localhost:3000
 ```
 
-The local development process creates ephemeral keys and permits simulated
-identities. For a database-backed local run, start PostgreSQL with
-`docker compose up -d postgres`, set `DATABASE_URL`, run `npm run migrate`, and
-then start the app. The migration user should be separate from the runtime
-user outside local development.
+`npm run demo` is the fastest path: one process, ephemeral keys, in-memory
+stores, and clearly labeled simulated identities. It is intentionally not a
+Telegram-authentication test and must never be exposed publicly.
+
+### One-process Telegram staging
+
+For the easiest persisted local test with a real Telegram bot, use the bundled
+setup and compose profile:
+
+```sh
+npm run setup:local
+npm run telegram:local
+# http://localhost:3000
+```
+
+`setup:local` creates a mode-600 ignored `.env.local`. If the mode-600
+`.env.staging` file exists, it copies the token into that file without printing
+it; otherwise add `TELEGRAM_BOT_TOKEN` directly to `.env.local`. The staging
+profile runs one combined application process and PostgreSQL, keeps the
+issuer-bound proof, challenge, session, and claim paths enabled, and disables
+the development signing route. It is much easier to operate than the split
+topology, but the combined process can see Telegram identity and must not make
+the production privacy-boundary claim.
+
+Useful commands:
+
+```sh
+npm run telegram:logs
+npm run telegram:down
+npm run telegram:reset   # also removes the local PostgreSQL volume
+```
+
+The split launcher remains available for testing the production trust boundary:
+`npm run local:backend`. It requires the mode-600 `.env.staging` token and a
+separately migrated local PostgreSQL runtime database.
+
+For a hand-written environment file, copy `.env.local.example` to
+`.env.local`, set mode `600`, fill in the token and generated secret values,
+then use `npm run telegram:local`.
 
 ### Local split backend with a real staging bot token
 

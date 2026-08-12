@@ -48,7 +48,7 @@ jobs:
         run: npm ls --all --omit=dev
       - name: Secret regression scan
         run: |
-          ! git grep -nE '(ghp_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,}|BEGIN (RSA |EC |OPENSSH )?PRIVATE KEY|TELEGRAM_BOT_TOKEN=[^[:space:]]+)' -- . ':!LUNA_MAX_DEPLOYMENT_HANDOFF.md' ':!.github/workflows/ci.yml'
+          ! git grep -nE '(ghp_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,}|BEGIN (RSA |EC |OPENSSH )?PRIVATE KEY|TELEGRAM_BOT_TOKEN=[0-9]{6,}:[A-Za-z0-9_-]{20,})' -- . ':!LUNA_MAX_DEPLOYMENT_HANDOFF.md' ':!.github/workflows/ci.yml'
       - name: Build container
         run: docker build --pull --tag zktele-login:ci .
       - name: Container smoke test

@@ -82,6 +82,25 @@ test('development configuration exposes simulation only when explicitly enabled'
   assert.equal(config.nullifierSecret.length, 32);
 });
 
+test('combined Telegram staging keeps the demo signer disabled', () => {
+  const secret = Buffer.alloc(32, 7).toString('base64');
+  const config = loadConfig({
+    NODE_ENV: 'development',
+    SERVICE_ROLE: 'combined',
+    ALLOW_DEV_INIT: 'false',
+    TELEGRAM_BOT_TOKEN: '123456:staging-token-with-enough-length',
+    NULLIFIER_SECRET: secret,
+    SESSION_SECRET: secret,
+    DATABASE_URL: 'postgresql://zktele_local:local-development-only@127.0.0.1:55432/zktele',
+    APP_ORIGIN: 'http://localhost:3000',
+    ALLOWED_ORIGINS: 'http://localhost:3000',
+  });
+  assert.equal(config.role, 'combined');
+  assert.equal(config.allowDevInit, false);
+  assert.equal(config.botToken, '123456:staging-token-with-enough-length');
+  assert.equal(config.databaseUrl.includes('local-development-only'), true);
+});
+
 test('relying configuration does not accept gateway secrets and pins public policy', () => {
   const publicKey = Buffer.from('-----BEGIN PUBLIC KEY-----\nfixture\n-----END PUBLIC KEY-----\n', 'utf8').toString('base64');
   const secret = Buffer.alloc(32, 4).toString('base64');

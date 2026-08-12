@@ -6,6 +6,13 @@ production deployment.
 
 ## Hosting compatibility gate
 
+For local development and Telegram staging, prefer the repository's
+one-process profile: `npm run setup:local && npm run telegram:local`. It keeps
+the production proof and persistence semantics while avoiding a second public
+service and cross-service CORS. This profile is not a production deployment:
+the combined process sees Telegram identity. Use the split gateway/relying
+roles below when the privacy boundary is part of the product claim.
+
 This application requires a Docker- or Node-capable runtime for the gateway
 and relying services, plus PostgreSQL with TLS. InfinityFree's free hosting
 environment does not provide Node.js, Docker, or PostgreSQL, so it cannot host

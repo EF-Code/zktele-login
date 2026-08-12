@@ -6,6 +6,11 @@ gateway key ID, issuer commitment, supported Telegram clients, rate/latency
 objectives, provider, secret manager, database endpoint, backup policy, and
 on-call owner.
 
+For local testing, use `npm run demo` for the fixture-only UI path or
+`npm run setup:local && npm run telegram:local` for a persisted, real-token
+combined staging run. Do not expose either local profile to the public
+internet.
+
 The backend cannot be deployed on InfinityFree's free PHP/MySQL-only hosting:
 keep the InfinityFree domain only as a DNS/static edge if desired, and run the
 Docker/Node gateway and relying service plus PostgreSQL on a compatible
