@@ -11,6 +11,7 @@ const state = {
 };
 
 const select = (selector) => document.querySelector(selector);
+const selectAll = (selector) => [...document.querySelectorAll(selector)];
 
 async function requestJson(url, { method = 'GET', body } = {}) {
   const options = { method, headers: {}, credentials: 'same-origin' };
@@ -41,7 +42,39 @@ function shortHash(value) {
 function setStatus(kind, message) {
   const status = select('#status');
   status.className = `status ${kind}`;
+  status.dataset.state = kind;
   status.textContent = message;
+}
+
+function setConnection(message, ready = false) {
+  const indicator = select('#connection-status');
+  if (!indicator) return;
+  indicator.classList.toggle('is-ready', ready);
+  indicator.replaceChildren();
+  const orb = document.createElement('span');
+  orb.className = 'status-orb';
+  orb.setAttribute('aria-hidden', 'true');
+  indicator.append(orb, document.createTextNode(message));
+}
+
+function setAuthBusy(busy) {
+  const login = select('#telegram-login');
+  login.disabled = busy;
+  login.setAttribute('aria-busy', String(busy));
+  login.querySelector('.button-label').textContent = busy
+    ? 'Generating proof…'
+    : 'Authenticate Telegram session';
+  selectAll('.identity').forEach((button) => {
+    button.disabled = busy;
+    button.setAttribute('aria-busy', String(busy));
+  });
+}
+
+function formatTimestamp(seconds) {
+  return new Intl.DateTimeFormat(undefined, {
+    dateStyle: 'medium',
+    timeStyle: 'short',
+  }).format(new Date(seconds * 1000));
 }
 
 function appendDetail(label, content, { monospace = false } = {}) {
@@ -59,6 +92,9 @@ function appendDetail(label, content, { monospace = false } = {}) {
 
 function addLogRow(source, nullifier, success, message = '') {
   state.attempts += 1;
+  select('.empty-row')?.remove();
+  const attemptCount = select('#attempt-count');
+  if (attemptCount) attemptCount.textContent = String(state.attempts);
   const row = document.createElement('tr');
   const values = [
     `#${state.attempts}`,
@@ -84,6 +120,7 @@ async function authenticate(initData, source) {
   select('#result').classList.remove('hidden');
   select('#detail').replaceChildren();
   setStatus('working', 'Validating Telegram data and generating proof…');
+  setAuthBusy(true);
   try {
     const challenge = await requestJson('/api/challenge');
     const gatewayBase = state.config.gatewayOrigin || '';
@@ -105,12 +142,13 @@ async function authenticate(initData, source) {
     if (!verification.isValid) throw new Error(verification.error || 'verification failed');
 
     state.lastAttestation = attestation;
-    setStatus('ok', 'Telegram session and gateway-attested proof verified');
+    setStatus('ok', 'Session verified — gateway proof accepted');
+    setConnection('Proof verified', true);
     appendDetail('Source', source);
     appendDetail('Nullifier', shortHash(verification.nullifierHash), { monospace: true });
     appendDetail('Issuer', verification.issuer);
     appendDetail('Action', verification.actionId);
-    appendDetail('Expires', new Date(verification.expiresAt * 1000).toISOString());
+    appendDetail('Expires', formatTimestamp(verification.expiresAt));
     appendDetail('Gateway key', shortHash(state.config.gatewayPublicKeyFingerprint), { monospace: true });
     appendDetail('Proof size', proofSize(attestation.proofPayload.proof));
 
@@ -127,6 +165,8 @@ async function authenticate(initData, source) {
   } catch (error) {
     setStatus('error', error.message || String(error));
     addLogRow(source, null, false, error.message);
+  } finally {
+    setAuthBusy(false);
   }
 }
 
@@ -141,7 +181,8 @@ function telegramInitData() {
 select('#telegram-login').addEventListener('click', async () => {
   const initData = telegramInitData();
   if (!initData) {
-    setStatus('error', 'No Telegram Mini App session is available. Open this page through the configured bot.');
+    setConnection('No Telegram session', false);
+    setStatus('error', 'No Telegram session detected. Open this page from the configured bot, or choose a local identity below.');
     select('#result').classList.remove('hidden');
     return;
   }
@@ -179,9 +220,14 @@ select('#cross-domain').addEventListener('click', async () => {
 async function claim() {
   if (!state.lastAttestation) return;
   const output = select('#claim-result');
+  const claimButton = select('#claim');
+  const claimLabel = claimButton.querySelector('.button-label');
   output.classList.remove('hidden');
   output.className = 'status working';
   output.textContent = 'Submitting claim…';
+  claimButton.disabled = true;
+  claimButton.setAttribute('aria-busy', 'true');
+  claimLabel.textContent = 'Submitting claim…';
   try {
     const result = await requestJson('/api/claim', {
       method: 'POST',
@@ -193,6 +239,10 @@ async function claim() {
   } catch (error) {
     output.className = 'status error';
     output.textContent = `Claim rejected: ${error.message}`;
+  } finally {
+    claimButton.disabled = false;
+    claimButton.setAttribute('aria-busy', 'false');
+    claimLabel.textContent = 'Claim current action';
   }
 }
 
@@ -206,6 +256,8 @@ async function enableDevelopmentSimulation() {
   for (const identity of DEV_IDENTITIES) {
     const button = document.createElement('button');
     button.className = 'identity';
+    button.type = 'button';
+    button.setAttribute('aria-label', `Use local fixture ${identity.label}`);
     button.textContent = `Simulate: ${identity.label}`;
     button.addEventListener('click', async () => {
       const { initData } = await requestJson('/api/dev/init', {
@@ -221,10 +273,18 @@ async function enableDevelopmentSimulation() {
 async function initialize() {
   state.config = await requestJson('/api/config');
   const telegramData = telegramInitData();
-  select('#telegram-help').textContent = telegramData
-    ? 'Telegram session detected and ready to authenticate.'
-    : 'Open through the configured Telegram bot. Local simulation is available only in development mode.';
-  if (state.config.devSimulationEnabled) await enableDevelopmentSimulation();
+  const help = select('#telegram-help');
+  if (telegramData) {
+    setConnection('Telegram session ready', true);
+    help.textContent = 'Telegram session detected. You can authenticate now.';
+  } else if (state.config.devSimulationEnabled) {
+    setConnection('Local simulation ready', true);
+    help.textContent = 'Normal browser detected. Choose a local fixture below to exercise the flow.';
+    await enableDevelopmentSimulation();
+  } else {
+    setConnection('Waiting for Telegram', false);
+    help.textContent = 'Open this page through the configured Telegram bot to provide a signed Mini App session.';
+  }
 }
 
 initialize().catch((error) => {
