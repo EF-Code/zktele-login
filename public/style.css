@@ -965,8 +965,142 @@ pre {
   max-width: 100%;
   overflow: auto;
   border: 1px solid var(--border);
-  border-radius: 4px;
-  padding: 0 0.3rem;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  font-size: 0.85em;
+  border-radius: var(--radius-sm);
+  background: rgba(4, 8, 12, 0.58);
+  color: var(--dim-strong);
+  font-size: 0.67rem;
+  line-height: 1.5;
+  text-align: left;
+}
+
+.dim {
+  color: var(--dim);
+}
+
+.hidden {
+  display: none !important;
+}
+
+@media (max-width: 900px) {
+  .topbar {
+    margin-bottom: 52px;
+  }
+
+  .hero-grid,
+  .result-grid {
+    grid-template-columns: 1fr;
+    gap: 1.2rem;
+  }
+
+  .hero-copy {
+    max-width: 700px;
+  }
+
+  .auth-card {
+    max-width: 680px;
+  }
+
+  .claim-card {
+    min-height: 0;
+  }
+
+  .claim-actions {
+    margin-top: 0;
+  }
+}
+
+@media (max-width: 620px) {
+  .shell {
+    width: min(100% - 24px, 560px);
+    padding-top: 16px;
+  }
+
+  .topbar {
+    align-items: flex-start;
+    margin-bottom: 42px;
+  }
+
+  .environment-badge {
+    padding: 0.42rem 0.55rem;
+    font-size: 0;
+  }
+
+  .environment-badge code {
+    display: none;
+  }
+
+  .environment-badge .live-dot {
+    width: 7px;
+    height: 7px;
+  }
+
+  h1 {
+    font-size: clamp(2.65rem, 14vw, 4rem);
+  }
+
+  .trust-row {
+    gap: 0.35rem;
+  }
+
+  .trust-item {
+    display: block;
+    padding: 0.62rem 0.35rem;
+  }
+
+  .trust-icon {
+    margin-bottom: 0.4rem;
+  }
+
+  .flow-rail {
+    gap: 0.45rem;
+    overflow-x: auto;
+    padding-bottom: 0.25rem;
+  }
+
+  .flow-line {
+    width: 24px;
+  }
+
+  .identities,
+  .detail-grid,
+  .security-list {
+    grid-template-columns: 1fr;
+  }
+
+  .security-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .card-topline {
+    margin-bottom: 1.35rem;
+  }
+
+  .connection-status {
+    max-width: 150px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .security-grid {
+    padding-right: 0;
+    padding-left: 0;
+  }
+
+  .footer {
+    justify-content: flex-start;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }
