@@ -856,23 +856,114 @@ tbody tr:not(.empty-row):hover {
 
 td.ok {
   color: var(--ok);
+  font-weight: 750;
 }
 
 td.err {
-  color: var(--err);
+  color: var(--red);
+  font-weight: 700;
 }
 
-ul {
-  padding-left: 1.2rem;
-  color: var(--text);
+.empty-row td {
+  padding: 1.15rem 0.85rem;
+  color: var(--dim);
+  text-align: center;
 }
 
-li {
-  margin-bottom: 0.5rem;
+.empty-mark {
+  margin-right: 0.5rem;
+  color: var(--border-strong);
+}
+
+.security-grid {
+  display: grid;
+  grid-template-columns: minmax(250px, 0.72fr) minmax(0, 1.28fr);
+  gap: clamp(1.3rem, 5vw, 4.5rem);
+  padding: 1.8rem 0.25rem 2.1rem;
+}
+
+.security-intro h2 {
+  max-width: 260px;
+  margin-top: 0.55rem;
+  font-size: 1.55rem;
+}
+
+.security-intro > p:last-child {
+  max-width: 310px;
+  margin: 0.85rem 0 0;
+  color: var(--dim);
+  font-size: 0.78rem;
+  line-height: 1.6;
+}
+
+.security-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.6rem;
+}
+
+.security-item {
+  display: flex;
+  gap: 0.75rem;
+  padding: 0.85rem 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.security-number {
+  color: var(--cyan);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.66rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.security-item strong {
+  color: var(--text-soft);
+  font-size: 0.76rem;
+  font-weight: 750;
+}
+
+.security-item small {
+  margin-top: 0.23rem;
+  color: var(--dim);
+  font-size: 0.68rem;
+  line-height: 1.4;
+}
+
+.footer {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 0.65rem;
+  padding-top: 1.1rem;
+  border-top: 1px solid var(--border);
+  color: var(--dim);
+  font-size: 0.66rem;
+}
+
+.footer-dot {
+  width: 5px;
+  height: 5px;
+  margin-right: 0.25rem;
+}
+
+.footer-separator {
+  color: var(--border-strong);
+}
+
+.mono,
+code,
+pre {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 }
 
 code {
-  background: var(--bg);
+  overflow-wrap: anywhere;
+}
+
+pre {
+  max-width: 100%;
+  overflow: auto;
   border: 1px solid var(--border);
   border-radius: 4px;
   padding: 0 0.3rem;
