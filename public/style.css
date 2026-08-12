@@ -392,44 +392,107 @@ h2 {
 }
 
 .card {
-  background: var(--card);
   border: 1px solid var(--border);
-  border-radius: 12px;
-  padding: 1.25rem;
-  margin-bottom: 1.25rem;
+  border-radius: var(--radius-lg);
+  background: linear-gradient(145deg, rgba(24, 34, 47, 0.9), rgba(13, 19, 27, 0.9));
+  box-shadow: var(--shadow);
 }
 
-.card h2 {
-  margin-top: 0;
-  font-size: 1.1rem;
+.auth-card,
+.result-card,
+.claim-card {
+  padding: clamp(1.2rem, 3vw, 1.65rem);
 }
 
-.hint {
+.auth-card {
+  position: relative;
+  overflow: hidden;
+}
+
+.auth-card::before {
+  position: absolute;
+  top: 0;
+  right: 10%;
+  left: 10%;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--cyan), transparent);
+  content: "";
+}
+
+.card-topline,
+.section-heading,
+.dev-panel-heading,
+.ledger-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.card-topline {
+  margin-bottom: 1.75rem;
+}
+
+.section-index {
   color: var(--dim);
-  font-size: 0.9rem;
-}
-
-.dev-label {
-  margin: 1rem 0 0.5rem;
-  color: var(--dim);
-  font-size: 0.75rem;
-  font-weight: 700;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.65rem;
   letter-spacing: 0.08em;
-  text-transform: uppercase;
 }
 
-.identities {
+.connection-status,
+.receipt-label,
+.scope-label,
+.ledger-count {
+  color: var(--dim-strong);
+  font-size: 0.68rem;
+}
+
+.connection-status .status-orb {
+  width: 6px;
+  height: 6px;
+  background: var(--amber);
+  box-shadow: 0 0 0 4px rgba(247, 200, 115, 0.09), 0 0 14px rgba(247, 200, 115, 0.6);
+}
+
+.connection-status.is-ready .status-orb {
+  background: var(--lime);
+  box-shadow: 0 0 0 4px rgba(185, 238, 120, 0.09), 0 0 14px rgba(185, 238, 120, 0.6);
+}
+
+.section-heading {
+  align-items: flex-start;
+}
+
+.section-heading .eyebrow {
+  margin-bottom: 0.45rem;
+}
+
+.lock-badge {
   display: grid;
-  gap: 0.5rem;
+  width: 2rem;
+  height: 2rem;
+  place-items: center;
+  border: 1px solid rgba(104, 228, 242, 0.25);
+  border-radius: 10px;
+  background: rgba(104, 228, 242, 0.08);
+  color: var(--cyan);
+  font-size: 1rem;
 }
 
-button {
-  background: var(--accent);
-  color: #fff;
-  border: none;
-  border-radius: 8px;
-  padding: 0.65rem 1rem;
-  font-size: 0.95rem;
+.card-copy {
+  margin: 0.85rem 0 0;
+  color: var(--text-soft);
+  font-size: 0.84rem;
+  line-height: 1.62;
+}
+
+.primary-button,
+.text-button,
+.identity {
+  min-height: 46px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
   cursor: pointer;
   width: 100%;
 }
