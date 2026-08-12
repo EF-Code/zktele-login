@@ -1,66 +1,186 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="theme-dark">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#0b1017" />
   <title>zktele-login — private Telegram authentication</title>
+  <link rel="preconnect" href="https://telegram.org" />
   <script src="https://telegram.org/js/telegram-web-app.js?63"></script>
   <link rel="stylesheet" href="/style.css" />
 </head>
 <body>
-  <main>
-    <header>
-      <h1>zktele-login</h1>
-      <p class="tagline">Telegram-backed access with a scoped anonymous nullifier.</p>
+  <a class="skip-link" href="#main-content">Skip to main content</a>
+  <div class="page-glow page-glow-one" aria-hidden="true"></div>
+  <div class="page-glow page-glow-two" aria-hidden="true"></div>
+
+  <main id="main-content" class="shell">
+    <header class="topbar">
+      <a class="brand" href="/" aria-label="zktele-login home">
+        <span class="brand-mark" aria-hidden="true">
+          <svg viewBox="0 0 32 32" role="img">
+            <path d="M16 3.5 27 7.7v7.6c0 6.5-4.4 11-11 13.2C10.4 26.3 6 21.8 6 15.3V7.7L16 3.5Z" />
+            <path d="m11.3 15.9 3.1 3.1 6.5-7" />
+          </svg>
+        </span>
+        <span class="brand-copy">
+          <span class="eyebrow">Private auth lab</span>
+          <span class="brand-name" translate="no">zktele<span>•</span>login</span>
+        </span>
+      </a>
+      <div class="environment-badge" aria-label="Local test environment">
+        <span class="live-dot" aria-hidden="true"></span>
+        <span>Local test build</span>
+        <code translate="no">issuer-v2</code>
+      </div>
     </header>
 
-    <section class="card">
-      <h2>Authenticate</h2>
-      <p class="hint">Telegram supplies signed Mini App data. The gateway validates it, generates a zero-knowledge proof, and signs the proof envelope. The relying app receives a nullifier, not your Telegram profile.</p>
-      <button id="telegram-login">Authenticate current Telegram session</button>
-      <p id="telegram-help" class="hint"></p>
-      <div id="dev-panel" class="hidden">
-        <p class="dev-label">Development simulation</p>
-        <div id="identities" class="identities"></div>
+    <section class="hero-grid" aria-labelledby="page-title">
+      <div class="hero-copy">
+        <p class="eyebrow accent-eyebrow">Telegram <span aria-hidden="true">×</span> zero knowledge</p>
+        <h1 id="page-title">Prove access.<br /><em>Keep identity private.</em></h1>
+        <p class="hero-lede">A Telegram-backed login flow that turns a verified session into a scoped, anonymous proof. The relying app sees the claim it needs—not your Telegram profile.</p>
+
+        <div class="trust-row" aria-label="Authentication trust boundaries">
+          <div class="trust-item">
+            <span class="trust-icon trust-icon-cyan" aria-hidden="true">↗</span>
+            <span><strong>HMAC checked</strong><small>Telegram authenticity</small></span>
+          </div>
+          <div class="trust-item">
+            <span class="trust-icon trust-icon-lime" aria-hidden="true">◈</span>
+            <span><strong>Proof bound</strong><small>Issuer + action policy</small></span>
+          </div>
+          <div class="trust-item">
+            <span class="trust-icon trust-icon-amber" aria-hidden="true">⌁</span>
+            <span><strong>Scoped claim</strong><small>No reusable identity</small></span>
+          </div>
+        </div>
+
+        <div class="flow-rail" aria-label="Authentication flow">
+          <div class="flow-step flow-step-active"><span>01</span><strong>Connect</strong><small>Telegram session</small></div>
+          <span class="flow-line" aria-hidden="true"></span>
+          <div class="flow-step"><span>02</span><strong>Attest</strong><small>Gateway proof</small></div>
+          <span class="flow-line" aria-hidden="true"></span>
+          <div class="flow-step"><span>03</span><strong>Claim</strong><small>One-time action</small></div>
+        </div>
       </div>
-      <button id="tamper" class="ghost" disabled>Tamper with the last attestation</button>
+
+      <section class="card auth-card" aria-labelledby="auth-heading">
+        <div class="card-topline">
+          <span class="section-index">01 / 03</span>
+          <span id="connection-status" class="connection-status"><span class="status-orb" aria-hidden="true"></span>Checking session…</span>
+        </div>
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">Start here</p>
+            <h2 id="auth-heading">Authenticate</h2>
+          </div>
+          <span class="lock-badge" aria-label="Server verified flow" title="Server verified flow" aria-hidden="true">⌁</span>
+        </div>
+        <p class="card-copy">Telegram signs the session. The gateway validates it and creates an issuer-bound proof before the relying app accepts anything.</p>
+
+        <button id="telegram-login" class="primary-button" type="button">
+          <span class="button-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24"><path d="m20.7 4.2-3 14.3c-.2 1- .8 1.3-1.6.8l-4.5-3.3-2.2 2.1c-.2.2-.4.4-.8.4l.3-4.6 8.4-7.6c.4-.3-.1-.5-.6-.2L6.3 12.7l-4.5-1.4c-1-.3-1-1 .2-1.5L19.6 3c.8-.3 1.5.2 1.1 1.2Z" /></svg>
+          </span>
+          <span class="button-label">Authenticate Telegram session</span>
+          <span class="button-arrow" aria-hidden="true">↗</span>
+        </button>
+        <p id="telegram-help" class="hint" aria-live="polite">Checking for a Telegram Mini App session…</p>
+
+        <div id="dev-panel" class="dev-panel hidden" aria-labelledby="dev-heading">
+          <div class="dev-panel-heading">
+            <span class="dev-marker" aria-hidden="true"></span>
+            <div>
+              <p id="dev-heading" class="eyebrow">Local-only shortcut</p>
+              <p class="dev-copy">Use a fixture identity to exercise the proof flow in a normal browser.</p>
+            </div>
+          </div>
+          <div id="identities" class="identities"></div>
+        </div>
+
+        <div class="auth-footnote">
+          <span class="footnote-icon" aria-hidden="true">i</span>
+          <span>Nothing is stored in browser storage. Sessions are server-side and scoped to this action.</span>
+        </div>
+      </section>
     </section>
 
-    <section id="result" class="card hidden">
-      <h2>Authentication result</h2>
-      <div id="status" class="status"></div>
-      <dl id="detail"></dl>
-      <button id="cross-domain" class="ghost" disabled>Verify against another app domain</button>
+    <section id="result" class="result-grid hidden" aria-labelledby="result-heading">
+      <section class="card result-card">
+        <div class="card-topline">
+          <span class="section-index">02 / 03</span>
+          <span class="receipt-label"><span class="receipt-dot" aria-hidden="true"></span>Proof receipt</span>
+        </div>
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">Verification result</p>
+            <h2 id="result-heading">Authentication result</h2>
+          </div>
+        </div>
+        <div id="status" class="status" role="status" aria-live="polite"></div>
+        <dl id="detail" class="detail-grid"></dl>
+        <div class="secondary-actions">
+          <button id="tamper" class="text-button" type="button" disabled><span aria-hidden="true">◌</span> Tamper test</button>
+          <button id="cross-domain" class="text-button" type="button" disabled><span aria-hidden="true">⌁</span> Cross-domain test</button>
+        </div>
+      </section>
+
+      <section class="card claim-card" aria-labelledby="claim-heading">
+        <div class="card-topline">
+          <span class="section-index">03 / 03</span>
+          <span class="scope-label">One-time action</span>
+        </div>
+        <p class="eyebrow">Your next move</p>
+        <h2 id="claim-heading">Claim the action</h2>
+        <p class="card-copy">The scoped nullifier lets this account claim once for this app and action without exposing a reusable Telegram identifier.</p>
+        <div class="claim-actions">
+          <button id="claim" class="primary-button" type="button" disabled><span class="button-label">Claim current action</span><span class="button-arrow" aria-hidden="true">→</span></button>
+          <button id="reclaim" class="text-button" type="button" disabled>Try the same claim again</button>
+        </div>
+        <div id="claim-result" class="status hidden" role="status" aria-live="polite"></div>
+      </section>
     </section>
 
-    <section class="card">
-      <h2>Claim this action</h2>
-      <p class="hint">The nullifier is stable for one Telegram account, app, and action. That permits one claim for this action without exposing a reusable cross-app identifier.</p>
-      <button id="claim" class="ghost" disabled>Claim current action</button>
-      <button id="reclaim" class="ghost" disabled>Try the same claim again</button>
-      <div id="claim-result" class="status hidden"></div>
+    <section class="card ledger-card" aria-labelledby="ledger-heading">
+      <div class="section-heading ledger-heading">
+        <div>
+          <p class="eyebrow">Local session ledger</p>
+          <h2 id="ledger-heading">Recent attempts</h2>
+        </div>
+        <span class="ledger-count" aria-label="Attempts recorded"><span id="attempt-count">0</span> attempts</span>
+      </div>
+      <div class="table-wrap">
+        <table id="log">
+          <thead>
+            <tr><th scope="col">Attempt</th><th scope="col">Source</th><th scope="col">Nullifier</th><th scope="col">Result</th></tr>
+          </thead>
+          <tbody>
+            <tr class="empty-row"><td colspan="4"><span class="empty-mark" aria-hidden="true">—</span>No authentication attempts yet</td></tr>
+          </tbody>
+        </table>
+      </div>
     </section>
 
-    <section class="card">
-      <h2>Session log</h2>
-      <table id="log">
-        <thead>
-          <tr><th>Attempt</th><th>Source</th><th>Nullifier</th><th>Result</th></tr>
-        </thead>
-        <tbody></tbody>
-      </table>
+    <section class="security-grid" aria-labelledby="boundary-heading">
+      <div class="security-intro">
+        <p class="eyebrow">Trust boundary</p>
+        <h2 id="boundary-heading">Designed to reveal less.</h2>
+        <p>The gateway sees Telegram identity to validate authenticity. The relying app receives the signed, scoped result.</p>
+      </div>
+      <div class="security-list">
+        <div class="security-item"><span class="security-number">01</span><span><strong>Telegram authenticity</strong><small>HMAC + freshness checked before proof generation.</small></span></div>
+        <div class="security-item"><span class="security-number">02</span><span><strong>Issuer authenticity</strong><small>Ed25519 gateway signature is pinned by the verifier.</small></span></div>
+        <div class="security-item"><span class="security-number">03</span><span><strong>Scoped deduplication</strong><small>One nullifier per account, application, and action.</small></span></div>
+        <div class="security-item"><span class="security-number">04</span><span><strong>Private by default</strong><small>No raw profile, proof witness, or session token in the UI.</small></span></div>
+      </div>
     </section>
 
-    <section class="card">
-      <h2>Security boundary</h2>
-      <ul>
-        <li><strong>Telegram authenticity</strong> — the gateway checks Telegram's HMAC and freshness before issuing anything.</li>
-        <li><strong>Issuer authenticity</strong> — relying apps require an Ed25519 signature from the configured gateway; an arbitrary Groth16 proof is not accepted.</li>
-        <li><strong>Scoped deduplication</strong> — the same Telegram account produces the same nullifier only for this app and action.</li>
-        <li><strong>Privacy boundary</strong> — the gateway necessarily sees Telegram identity while validating it. Relying apps can operate on the signed nullifier instead.</li>
-        <li><strong>Domain and policy binding</strong> — the gateway signature covers the domain, action, expiry policy, and full proof payload.</li>
-      </ul>
-    </section>
+    <footer class="footer">
+      <span><span class="footer-dot" aria-hidden="true"></span> Local test environment</span>
+      <span class="footer-separator" aria-hidden="true">•</span>
+      <span>Issuer-bound proofs · server-side sessions</span>
+    </footer>
   </main>
   <script src="/app.js"></script>
 </body>
